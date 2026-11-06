@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Avatar, BackButton, Button, Icon } from '../components/ui';
 import type { Actions } from '../App';
-import { avatarFor, dayKey, isAdmin, occurrencesOn, type HouseView } from '../state';
+import { avatarFor, dayKey, isAdmin, occurrencesOn, type Account, type HouseView } from '../state';
 
-export function Members({ view: s, actions }: { view: HouseView; actions: Actions }) {
+export function Members({ view: s, account, actions }: { view: HouseView; account: Account; actions: Actions }) {
   const [copied, setCopied] = useState(false);
   const admin = isAdmin(s);
   const now = new Date();
@@ -77,9 +77,17 @@ export function Members({ view: s, actions }: { view: HouseView; actions: Action
         })}
       </ul>
       <div className="spacer" style={{ minHeight: 24 }} />
-      <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.leave()}>
-        Sair da casa
-      </Button>
+      <div className="account">
+        <span className="caption">Conta: {account.email}</span>
+        <div className="account__actions">
+          <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.leave()}>
+            Sair da casa
+          </Button>
+          <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.logout()}>
+            Sair da conta
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

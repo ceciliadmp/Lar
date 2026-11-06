@@ -1,7 +1,7 @@
-import type { HouseView, Request, Response, Session, Task } from '../api/_lib/house';
+import type { Account, HouseView, LegacySession, Request, Response, Task } from '../api/_lib/house';
 
-export type { HouseView, Session, Task };
-export type Screen = 'welcome' | 'create' | 'join' | 'tasks' | 'members';
+export type { Account, HouseView, Task };
+export type Screen = 'welcome' | 'signup' | 'login' | 'home' | 'create' | 'join' | 'tasks' | 'members';
 export type Filter = 'all' | 'mine' | 'done';
 
 /* ---------- API ---------- */
@@ -31,25 +31,43 @@ export async function api(req: Request): Promise<Extract<Response, { ok: true }>
   return data;
 }
 
-/* ---------- sessão salva neste aparelho ---------- */
+/* ---------- login salvo neste aparelho ---------- */
 
-const SESSION_KEY = 'lar:session:v1';
+const TOKEN_KEY = 'lar:auth:v1';
+/** Sessão de antes das contas: usada uma vez para ligar o lugar antigo na casa à conta. */
+const LEGACY_KEY = 'lar:session:v1';
 
-export function loadSession(): Session | null {
+export function loadToken(): string | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    return localStorage.getItem(TOKEN_KEY);
   } catch {
     return null;
   }
 }
 
-export function saveSession(s: Session | null) {
+export function saveToken(t: string | null) {
   try {
-    if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s));
-    else localStorage.removeItem(SESSION_KEY);
+    if (t) localStorage.setItem(TOKEN_KEY, t);
+    else localStorage.removeItem(TOKEN_KEY);
   } catch {
-    /* sem armazenamento: a sessão dura só enquanto a página estiver aberta */
+    /* sem armazenamento: o login dura só enquanto a página estiver aberta */
+  }
+}
+
+export function loadLegacy(): LegacySession | undefined {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    return raw ? (JSON.parse(raw) as LegacySession) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function clearLegacy() {
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* ignora */
   }
 }
 

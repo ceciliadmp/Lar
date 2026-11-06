@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiError, api, loadSession, saveSession, type Filter, type HouseView, type Screen, type Session } from './state';
+import {
+  ApiError,
+  api,
+  clearLegacy,
+  loadLegacy,
+  loadToken,
+  saveToken,
+  type Account,
+  type Filter,
+  type HouseView,
+  type Screen,
+} from './state';
+import { Home, Login, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Members } from './screens/Members';
@@ -7,14 +19,19 @@ import { NewTaskSheet } from './screens/NewTaskSheet';
 
 const POLL_MS = 4000;
 
+type ApiResult = Awaited<ReturnType<typeof api>>;
+
 export interface Actions {
   go(screen: Screen): void;
   setFilter(f: Filter): void;
   openSheet(): void;
   closeSheet(): void;
-  /** Retorna uma mensagem de erro, ou null se deu certo. */
-  create(houseName: string, name: string): Promise<string | null>;
-  join(code: string, name: string): Promise<string | null>;
+  /** Os formulários recebem uma mensagem de erro, ou null se deu certo. */
+  signup(name: string, email: string, password: string): Promise<string | null>;
+  login(email: string, password: string): Promise<string | null>;
+  logout(): void;
+  create(houseName: string): Promise<string | null>;
+  join(code: string): Promise<string | null>;
   /** `day` é a chave do dia marcado (para recorrentes, cada dia conta separado). */
   toggleTask(id: number, day: string): void;
   addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null): void;
@@ -25,32 +42,49 @@ export interface Actions {
 }
 
 export default function App() {
-  const [session, setSession] = useState<Session | null>(loadSession);
+  const [token, setToken] = useState<string | null>(loadToken);
+  const [account, setAccount] = useState<Account | null>(null);
   const [view, setView] = useState<HouseView | null>(null);
-  const [screen, setScreen] = useState<Screen>(session ? 'tasks' : 'welcome');
+  const [booting, setBooting] = useState(!!token);
+  const [screen, setScreen] = useState<Screen>('welcome');
   const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [fresh, setFresh] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const sessionRef = useRef(session);
-  sessionRef.current = session;
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const hadHouse = useRef(false);
+
+  /** Aplica a resposta do servidor: conta, casa e, se a casa sumiu, volta ao início. */
+  const apply = useCallback((res: ApiResult) => {
+    setAccount(res.account);
+    setView(res.view);
+    if (!res.view) {
+      setSheetOpen(false);
+      setScreen((s) => (s === 'tasks' || s === 'members' ? 'home' : s));
+      if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
+    }
+    hadHouse.current = !!res.view;
+  }, []);
 
   const signOut = useCallback((message?: string) => {
-    saveSession(null);
-    setSession(null);
+    saveToken(null);
+    setToken(null);
+    setAccount(null);
     setView(null);
+    hadHouse.current = false;
     setSheetOpen(false);
+    setBooting(false);
     setScreen('welcome');
     setNotice(message ?? null);
   }, []);
 
-  /** Envia uma ação da casa e atualiza a tela com a resposta. */
   const send = useCallback(
     async (req: Parameters<typeof api>[0]) => {
       try {
         const res = await api(req);
-        if (res.view) setView(res.view);
         setNotice(null);
+        apply(res);
         return res;
       } catch (e) {
         const err = e as ApiError;
@@ -59,33 +93,59 @@ export default function App() {
         return null;
       }
     },
-    [signOut],
+    [apply, signOut],
   );
 
-  // Busca a casa ao abrir e de tempos em tempos, para ver o que os outros fizeram.
+  // Ao abrir: carrega o perfil salvo. Depois, atualiza de tempos em tempos para ver o que os outros fizeram.
   useEffect(() => {
-    if (!session) return;
-    const refresh = () => {
-      if (document.visibilityState === 'visible' && sessionRef.current) {
-        void send({ action: 'get', session: sessionRef.current });
+    if (!token) return;
+    let first = true;
+    const refresh = async () => {
+      if (document.visibilityState !== 'visible' || !tokenRef.current) return;
+      const res = await send({ action: 'me', token: tokenRef.current });
+      if (first && res) {
+        first = false;
+        setScreen((s) => (s === 'welcome' ? (res.view ? 'tasks' : 'home') : s));
+        setBooting(false);
       }
     };
-    refresh();
+    void refresh();
     const timer = window.setInterval(refresh, POLL_MS);
     document.addEventListener('visibilitychange', refresh);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', refresh);
     };
-  }, [session, send]);
+  }, [token, send]);
 
-  const enter = (s: Session, v: HouseView, isNew: boolean) => {
-    saveSession(s);
-    setSession(s);
-    setView(v);
+  /** Entrou na conta: guarda o login e vai para a casa (ou para escolher uma). */
+  const signedIn = (res: ApiResult) => {
+    saveToken(res.token!);
+    clearLegacy();
+    apply(res);
+    setFilter('all');
+    setFresh(false);
+    setNotice(null);
+    setScreen(res.view ? 'tasks' : 'home');
+    setToken(res.token!);
+  };
+
+  /** Para os formulários: roda a ação e devolve a mensagem de erro. */
+  const attempt = async (run: () => Promise<void>) => {
+    try {
+      await run();
+      return null;
+    } catch (e) {
+      const err = e as ApiError;
+      if (err.status === 401 && tokenRef.current) signOut(err.message);
+      return err.message;
+    }
+  };
+
+  const enterHouse = (res: ApiResult, isNew: boolean) => {
+    apply(res);
     setFilter('all');
     setFresh(isNew);
-    setNotice(null);
     setScreen('tasks');
   };
 
@@ -97,26 +157,19 @@ export default function App() {
     setFilter,
     openSheet: () => setSheetOpen(true),
     closeSheet: () => setSheetOpen(false),
-    create: async (houseName, name) => {
-      try {
-        const res = await api({ action: 'create', houseName, name });
-        enter(res.session!, res.view!, true);
-        return null;
-      } catch (e) {
-        return (e as Error).message;
-      }
+    signup: (name, email, password) =>
+      attempt(async () => signedIn(await api({ action: 'signup', name, email, password, legacy: loadLegacy() }))),
+    login: (email, password) =>
+      attempt(async () => signedIn(await api({ action: 'login', email, password, legacy: loadLegacy() }))),
+    logout: () => {
+      if (token) void api({ action: 'logout', token }).catch(() => undefined);
+      signOut();
     },
-    join: async (code, name) => {
-      try {
-        const res = await api({ action: 'join', code, name });
-        enter(res.session!, res.view!, false);
-        return null;
-      } catch (e) {
-        return (e as Error).message;
-      }
-    },
+    create: (houseName) =>
+      attempt(async () => enterHouse(await api({ action: 'createHouse', token: token!, houseName }), true)),
+    join: (code) => attempt(async () => enterHouse(await api({ action: 'joinHouse', token: token!, code }), false)),
     toggleTask: (id, day) => {
-      if (!session || !view) return;
+      if (!token || !view) return;
       // Marca na hora; a resposta do servidor confirma.
       setView({
         ...view,
@@ -128,25 +181,26 @@ export default function App() {
           return { ...t, completions };
         }),
       });
-      void send({ action: 'toggleTask', session, taskId: id, date: day });
+      void send({ action: 'toggleTask', token, taskId: id, date: day });
     },
     addTask: (title, assignee, date, repeat) => {
-      if (!session) return;
+      if (!token) return;
       setSheetOpen(false);
-      void send({ action: 'addTask', session, title, assignee, date, repeat });
+      void send({ action: 'addTask', token, title, assignee, date, repeat });
     },
     deleteTask: (id) => {
-      if (!session || !view) return;
+      if (!token || !view) return;
       setView({ ...view, tasks: view.tasks.filter((t) => t.id !== id) });
-      void send({ action: 'deleteTask', session, taskId: id });
+      void send({ action: 'deleteTask', token, taskId: id });
     },
-    removeMember: (id) => session && void send({ action: 'removeMember', session, memberId: id }),
-    newCode: () => session && void send({ action: 'newCode', session }),
+    removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
+    newCode: () => token && void send({ action: 'newCode', token }),
     leave: () => {
-      if (!session) return;
+      if (!token) return;
       if (!window.confirm('Sair desta casa? Para voltar, você vai precisar do código.')) return;
-      void api({ action: 'leave', session }).catch(() => undefined);
-      signOut();
+      hadHouse.current = false;
+      void send({ action: 'leave', token });
+      setScreen('home');
     },
   };
 
@@ -154,15 +208,22 @@ export default function App() {
 
   return (
     <main className="app">
-      {screen === 'welcome' && <Welcome actions={actions} />}
-      {screen === 'create' && <CreateHouse actions={actions} />}
-      {screen === 'join' && <JoinHouse actions={actions} />}
-      {inHouse && !view && (
-        <div className="screen loading" aria-live="polite">Carregando a casa…</div>
+      {booting ? (
+        <div className="screen loading" aria-live="polite">Carregando…</div>
+      ) : (
+        <>
+          {screen === 'welcome' && <Welcome actions={actions} />}
+          {screen === 'signup' && <Signup actions={actions} />}
+          {screen === 'login' && <Login actions={actions} />}
+          {screen === 'home' && account && <Home account={account} actions={actions} />}
+          {screen === 'create' && <CreateHouse actions={actions} />}
+          {screen === 'join' && <JoinHouse actions={actions} />}
+          {inHouse && !view && <div className="screen loading" aria-live="polite">Carregando a casa…</div>}
+          {screen === 'tasks' && view && <Tasks view={view} filter={filter} fresh={fresh} actions={actions} />}
+          {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
+          {screen === 'tasks' && view && sheetOpen && <NewTaskSheet view={view} actions={actions} />}
+        </>
       )}
-      {screen === 'tasks' && view && <Tasks view={view} filter={filter} fresh={fresh} actions={actions} />}
-      {screen === 'members' && view && <Members view={view} actions={actions} />}
-      {screen === 'tasks' && view && sheetOpen && <NewTaskSheet view={view} actions={actions} />}
       {notice && (
         <div className="notice" role="status">
           <span>{notice}</span>

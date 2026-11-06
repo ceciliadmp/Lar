@@ -277,3 +277,24 @@ h1, h2, p { margin: 0; }
 }
 .notice span { flex-grow: 1; padding: 12px 0; }
 .notice__close { width: 44px; height: 44px; border: 0; background: transparent; color: #fff; font-size: 22px; }
+
+/* Senha com mostrar/ocultar */
+.password { position: relative; }
+.password input { padding-right: 92px; }
+.password__toggle {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Conta na tela de membros */
+.account { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.account__actions { display: flex; gap: 8px; justify-content: center; }

@@ -10,7 +10,7 @@ function redisStore(): Store | null {
   const redis = new Redis({ url, token, automaticDeserialization: false });
   return {
     get: (k) => redis.get<string>(k),
-    set: async (k, v) => void (await redis.set(k, v)),
+    set: async (k, v, ttl) => void (await (ttl ? redis.set(k, v, { ex: ttl }) : redis.set(k, v))),
     setIfAbsent: async (k, v) => (await redis.set(k, v, { nx: true })) === 'OK',
     del: async (k) => void (await redis.del(k)),
   };
