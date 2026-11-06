@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Avatar, BackButton, Button, Icon } from '../components/ui';
-import { avatarFor, isAdmin, type Action, type State } from '../state';
+import type { Actions } from '../App';
+import { avatarFor, isAdmin, type HouseView } from '../state';
 
-export function Members({ state: s, dispatch }: { state: State; dispatch: (a: Action) => void }) {
+export function Members({ view: s, actions }: { view: HouseView; actions: Actions }) {
   const [copied, setCopied] = useState(false);
   const admin = isAdmin(s);
 
@@ -17,7 +18,7 @@ export function Members({ state: s, dispatch }: { state: State; dispatch: (a: Ac
 
   return (
     <div className="screen members">
-      <BackButton label="Voltar para tarefas" onClick={() => dispatch({ type: 'go', screen: 'tasks' })} />
+      <BackButton label="Voltar para tarefas" onClick={() => actions.go('tasks')} />
       <span className="eyebrow" style={{ marginTop: 16 }}>{s.house.name}</span>
       <h1 className="title-m" style={{ marginTop: 4 }}>Membros</h1>
 
@@ -35,7 +36,7 @@ export function Members({ state: s, dispatch }: { state: State; dispatch: (a: Ac
               variant="secondary"
               size="sm"
               onClick={() => {
-                dispatch({ type: 'newCode' });
+                actions.newCode();
                 setCopied(false);
               }}
             >
@@ -64,7 +65,7 @@ export function Members({ state: s, dispatch }: { state: State; dispatch: (a: Ac
                   size="sm"
                   style={{ padding: '0 12px', borderRadius: 10 }}
                   aria-label={`Remover ${m.name} da casa`}
-                  onClick={() => dispatch({ type: 'removeMember', id: m.id })}
+                  onClick={() => actions.removeMember(m.id)}
                 >
                   Remover
                 </Button>
@@ -74,7 +75,7 @@ export function Members({ state: s, dispatch }: { state: State; dispatch: (a: Ac
         })}
       </ul>
       <div className="spacer" style={{ minHeight: 24 }} />
-      <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => dispatch({ type: 'leave' })}>
+      <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.leave()}>
         Sair da casa
       </Button>
     </div>

@@ -1,16 +1,27 @@
 import { Avatar, Button, Chip, Icon } from '../components/ui';
-import { avatarFor, nameOf, type Action, type Filter, type State } from '../state';
+import type { Actions } from '../App';
+import { avatarFor, nameOf, type Filter, type HouseView } from '../state';
 
-export function Tasks({ state: s, dispatch }: { state: State; dispatch: (a: Action) => void }) {
+export function Tasks({
+  view: s,
+  filter,
+  fresh,
+  actions,
+}: {
+  view: HouseView;
+  filter: Filter;
+  fresh: boolean;
+  actions: Actions;
+}) {
   const me = s.meId;
   const total = s.tasks.length;
   const doneCount = s.tasks.filter((t) => t.done).length;
   const mineCount = s.tasks.filter((t) => t.assignee === me && !t.done).length;
 
   let list = s.tasks.slice();
-  if (s.filter === 'mine') list = list.filter((t) => t.assignee === me && !t.done);
-  if (s.filter === 'done') list = list.filter((t) => t.done);
-  if (s.filter === 'all') list.sort((a, b) => Number(a.done) - Number(b.done));
+  if (filter === 'mine') list = list.filter((t) => t.assignee === me && !t.done);
+  if (filter === 'done') list = list.filter((t) => t.done);
+  if (filter === 'all') list.sort((a, b) => Number(a.done) - Number(b.done));
 
   const filters: { id: Filter; label: string }[] = [
     { id: 'all', label: 'Todas' },
@@ -19,12 +30,12 @@ export function Tasks({ state: s, dispatch }: { state: State; dispatch: (a: Acti
   ];
 
   let empty = { title: 'Nenhuma tarefa ainda', text: 'Toque em + para criar a primeira.' };
-  if (total > 0 && s.filter === 'mine') empty = { title: 'Nada com você agora', text: 'Aproveite o descanso.' };
-  if (total > 0 && s.filter === 'done') empty = { title: 'Nada concluído ainda', text: 'As tarefas feitas aparecem aqui.' };
+  if (total > 0 && filter === 'mine') empty = { title: 'Nada com você agora', text: 'Aproveite o descanso.' };
+  if (total > 0 && filter === 'done') empty = { title: 'Nada concluído ainda', text: 'As tarefas feitas aparecem aqui.' };
 
   const pct = total ? Math.round((doneCount / total) * 100) : 0;
-  const showInvite = s.fresh && s.members.length === 1;
-  const goMembers = () => dispatch({ type: 'go', screen: 'members' });
+  const showInvite = fresh && s.members.length === 1;
+  const goMembers = () => actions.go('members');
 
   return (
     <div className="tasks">
@@ -46,7 +57,7 @@ export function Tasks({ state: s, dispatch }: { state: State; dispatch: (a: Acti
         </div>
         <div className="chips" style={{ marginTop: 22, flexWrap: 'nowrap' }}>
           {filters.map((f) => (
-            <Chip key={f.id} filter pressed={s.filter === f.id} onClick={() => dispatch({ type: 'setFilter', filter: f.id })}>
+            <Chip key={f.id} filter pressed={filter === f.id} onClick={() => actions.setFilter(f.id)}>
               {f.label}
             </Chip>
           ))}
@@ -86,7 +97,7 @@ export function Tasks({ state: s, dispatch }: { state: State; dispatch: (a: Acti
                   className="task__check"
                   aria-label={(t.done ? 'Reabrir: ' : 'Concluir: ') + t.title}
                   aria-pressed={t.done}
-                  onClick={() => dispatch({ type: 'toggleTask', id: t.id })}
+                  onClick={() => actions.toggleTask(t.id)}
                 >
                   <span className="task__circle" style={{ color: '#fff' }}>
                     {t.done && <Icon name="check" size={14} strokeWidth={3} />}
@@ -103,7 +114,7 @@ export function Tasks({ state: s, dispatch }: { state: State; dispatch: (a: Acti
         </ul>
       </div>
 
-      <button type="button" className="fab" aria-label="Nova tarefa" onClick={() => dispatch({ type: 'openSheet' })}>
+      <button type="button" className="fab" aria-label="Nova tarefa" onClick={() => actions.openSheet()}>
         <Icon name="plus" size={26} strokeWidth={2.2} />
       </button>
     </div>

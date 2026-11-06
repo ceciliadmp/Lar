@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Chip, Icon, IconButton, TextField } from '../components/ui';
-import type { Action, State } from '../state';
+import type { Actions } from '../App';
+import type { HouseView } from '../state';
 
-export function NewTaskSheet({ state: s, dispatch }: { state: State; dispatch: (a: Action) => void }) {
+export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: Actions }) {
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const close = () => dispatch({ type: 'closeSheet' });
+  const close = () => actions.closeSheet();
   const disabled = !title.trim();
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export function NewTaskSheet({ state: s, dispatch }: { state: State; dispatch: (
         aria-labelledby="sheet-title"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!disabled) dispatch({ type: 'addTask', title: title.trim(), assignee });
+          if (!disabled) actions.addTask(title.trim(), assignee);
         }}
       >
         <div className="sheet__grabber" aria-hidden="true" />

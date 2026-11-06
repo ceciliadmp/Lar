@@ -1,10 +1,8 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import type { Actions } from '../App';
 import { BackButton, Button, Icon, TextField } from '../components/ui';
-import type { Action } from '../state';
 
-type Dispatch = (a: Action) => void;
-
-export function Welcome({ dispatch }: { dispatch: Dispatch }) {
+export function Welcome({ actions }: { actions: Actions }) {
   return (
     <div className="screen welcome">
       <div className="logo" style={{ color: '#fff' }}>
@@ -16,8 +14,8 @@ export function Welcome({ dispatch }: { dispatch: Dispatch }) {
       </p>
       <div className="spacer" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <Button onClick={() => dispatch({ type: 'go', screen: 'create' })}>Criar uma casa</Button>
-        <Button variant="secondary" onClick={() => dispatch({ type: 'go', screen: 'join' })}>
+        <Button onClick={() => actions.go('create')}>Criar uma casa</Button>
+        <Button variant="secondary" onClick={() => actions.go('join')}>
           Entrar com um código
         </Button>
         <p className="caption" style={{ marginTop: 8, textAlign: 'center' }}>
@@ -28,20 +26,31 @@ export function Welcome({ dispatch }: { dispatch: Dispatch }) {
   );
 }
 
-export function CreateHouse({ dispatch }: { dispatch: Dispatch }) {
+/** Estado comum dos dois formulários: enviando e mensagem de erro. */
+function useSubmit(run: () => Promise<string | null>) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const err = await run();
+    setBusy(false);
+    setError(err);
+  };
+  return { busy, error, onSubmit };
+}
+
+export function CreateHouse({ actions }: { actions: Actions }) {
   const [house, setHouse] = useState('');
   const [name, setName] = useState('');
   const disabled = !(house.trim() && name.trim());
+  const { busy, error, onSubmit } = useSubmit(() => actions.create(house.trim(), name.trim()));
 
   return (
-    <form
-      className="screen"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!disabled) dispatch({ type: 'createHouse', house: house.trim(), name: name.trim() });
-      }}
-    >
-      <BackButton onClick={() => dispatch({ type: 'go', screen: 'welcome' })} />
+    <form className="screen" onSubmit={onSubmit}>
+      <BackButton onClick={() => actions.go('welcome')} />
       <h1 className="title-m" style={{ marginTop: 16 }}>Criar casa</h1>
       <p className="lead" style={{ margin: '8px 0 28px' }}>
         Você será o administrador e receberá um código para convidar as pessoas.
@@ -49,27 +58,23 @@ export function CreateHouse({ dispatch }: { dispatch: Dispatch }) {
       <div className="fields">
         <TextField id="f-house" label="Nome da casa" placeholder="Ex.: Apartamento 302" value={house} onChange={(e) => setHouse(e.target.value)} />
         <TextField id="f-name-c" label="Seu nome" placeholder="Como os outros vão te ver" value={name} onChange={(e) => setName(e.target.value)} />
+        {error && <p className="form-error" role="alert">{error}</p>}
       </div>
       <div className="spacer" />
-      <Button type="submit" disabled={disabled}>Criar casa</Button>
+      <Button type="submit" disabled={disabled || busy}>{busy ? 'Criando…' : 'Criar casa'}</Button>
     </form>
   );
 }
 
-export function JoinHouse({ dispatch }: { dispatch: Dispatch }) {
+export function JoinHouse({ actions }: { actions: Actions }) {
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const disabled = !(code.trim() && name.trim());
+  const { busy, error, onSubmit } = useSubmit(() => actions.join(code.trim(), name.trim()));
 
   return (
-    <form
-      className="screen"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!disabled) dispatch({ type: 'joinHouse', code: code.trim(), name: name.trim() });
-      }}
-    >
-      <BackButton onClick={() => dispatch({ type: 'go', screen: 'welcome' })} />
+    <form className="screen" onSubmit={onSubmit}>
+      <BackButton onClick={() => actions.go('welcome')} />
       <h1 className="title-m" style={{ marginTop: 16 }}>Entrar numa casa</h1>
       <p className="lead" style={{ margin: '8px 0 28px' }}>Peça o código para quem administra a casa.</p>
       <div className="fields">
@@ -79,13 +84,16 @@ export function JoinHouse({ dispatch }: { dispatch: Dispatch }) {
           placeholder="ABC-123"
           className="code-input"
           autoCapitalize="characters"
+          autoComplete="off"
           value={code}
+          aria-invalid={!!error}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
         />
         <TextField id="f-name-j" label="Seu nome" placeholder="Como os outros vão te ver" value={name} onChange={(e) => setName(e.target.value)} />
+        {error && <p className="form-error" role="alert">{error}</p>}
       </div>
       <div className="spacer" />
-      <Button type="submit" disabled={disabled}>Entrar</Button>
+      <Button type="submit" disabled={disabled || busy}>{busy ? 'Entrando…' : 'Entrar'}</Button>
     </form>
   );
 }
