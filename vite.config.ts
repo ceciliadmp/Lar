@@ -14,7 +14,11 @@ function localApi(): Plugin {
         req.on('end', async () => {
           let out;
           try {
-            out = await handle(store, JSON.parse(body || '{}'));
+            out = await handle(store, JSON.parse(body || '{}'), {
+              baseUrl: `http://localhost:${server.config.server.port ?? 5173}`,
+              // Em desenvolvimento não manda e-mail: mostra o link no terminal.
+              sendEmail: async (email) => console.log(`\n[e-mail para ${email.to}] ${email.subject}\n${email.text}\n`),
+            });
           } catch {
             out = { ok: false as const, status: 400, error: 'Pedido inválido.' };
           }

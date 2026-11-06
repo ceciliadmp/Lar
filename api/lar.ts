@@ -1,6 +1,6 @@
 // Função da Vercel: POST /api/lar
 import { Redis } from '@upstash/redis';
-import { handle, type Store } from './_lib/house.js';
+import { handle, type Email, type Env, type Store } from './_lib/house.js';
 
 function redisStore(): Store | null {
   // A integração Upstash da Vercel cria KV_REST_API_*; uma conta Upstash direta usa UPSTASH_REDIS_REST_*.
@@ -14,6 +14,28 @@ function redisStore(): Store | null {
     setIfAbsent: async (k, v) => (await redis.set(k, v, { nx: true })) === 'OK',
     del: async (k) => void (await redis.del(k)),
   };
+}
+
+/** Envio pelo Resend (resend.com). Precisa de RESEND_API_KEY; EMAIL_FROM é o remetente. */
+function resendSender(): Env['sendEmail'] {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  const from = process.env.EMAIL_FROM ?? 'Lar <onboarding@resend.dev>';
+  return async (email: Email) => {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ from, to: [email.to], subject: email.subject, text: email.text, html: email.html }),
+    });
+    if (!res.ok) throw new Error(`Resend ${res.status}: ${await res.text()}`);
+  };
+}
+
+/** Endereço público do app: APP_URL, senão o domínio de produção que a Vercel informa. */
+function baseUrl(): string {
+  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return 'http://localhost:5173';
 }
 
 const json = (body: unknown, status = 200) =>
@@ -33,6 +55,6 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return json({ ok: false, error: 'Pedido inválido.' }, 400);
   }
-  const res = await handle(store, body);
+  const res = await handle(store, body, { baseUrl: baseUrl(), sendEmail: resendSender() });
   return json(res, res.ok ? 200 : res.status);
 }

@@ -1,7 +1,7 @@
 import type { Account, HouseView, LegacySession, Request, Response, Task } from '../api/_lib/house';
 
 export type { Account, HouseView, Task };
-export type Screen = 'welcome' | 'signup' | 'login' | 'home' | 'create' | 'join' | 'tasks' | 'members';
+export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'members';
 export type Filter = 'all' | 'mine' | 'done';
 
 /* ---------- API ---------- */

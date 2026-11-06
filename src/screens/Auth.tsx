@@ -88,12 +88,86 @@ export function Login({ actions }: { actions: Actions }) {
         <TextField id="f-email-l" label="E-mail" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="voce@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
         <PasswordField id="f-pass-l" label="Senha" autoComplete="current-password" value={password} onChange={setPassword} />
         {error && <p className="form-error" role="alert">{error}</p>}
+        <button type="button" className="link-btn" onClick={() => actions.go('forgot')}>
+          Esqueci minha senha
+        </button>
       </div>
       <div className="spacer" style={{ minHeight: 24 }} />
       <Button type="submit" disabled={!email.trim() || !password || busy}>{busy ? 'Entrando…' : 'Entrar'}</Button>
       <Button variant="ghost" style={{ marginTop: 8, height: 48, fontSize: 14 }} onClick={() => actions.go('signup')}>
         Criar uma conta
       </Button>
+    </form>
+  );
+}
+
+export function Forgot({ actions }: { actions: Actions }) {
+  const [email, setEmail] = useState('');
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const { busy, error, onSubmit } = useSubmit(async () => {
+    const err = await actions.requestReset(email.trim());
+    if (!err) setSentTo(email.trim());
+    return err;
+  });
+
+  if (sentTo) {
+    return (
+      <div className="screen">
+        <BackButton onClick={() => actions.go('login')} />
+        <h1 className="title-m" style={{ marginTop: 16 }}>Confira seu e-mail</h1>
+        <p className="lead" style={{ marginTop: 8 }}>
+          Se existir uma conta com <strong>{sentTo}</strong>, mandamos um link para criar uma senha nova. Ele vale por 1 hora.
+        </p>
+        <p className="caption" style={{ marginTop: 16 }}>Não chegou? Olhe a pasta de spam ou lixo eletrônico.</p>
+        <div className="spacer" />
+        <Button onClick={() => actions.go('login')}>Voltar para entrar</Button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="screen" onSubmit={onSubmit}>
+      <BackButton onClick={() => actions.go('login')} />
+      <h1 className="title-m" style={{ marginTop: 16 }}>Esqueci minha senha</h1>
+      <p className="lead" style={{ margin: '8px 0 28px' }}>
+        Digite o e-mail da sua conta. Vamos mandar um link para você criar uma senha nova.
+      </p>
+      <div className="fields">
+        <TextField id="f-email-r" label="E-mail" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" placeholder="voce@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        {error && <p className="form-error" role="alert">{error}</p>}
+      </div>
+      <div className="spacer" style={{ minHeight: 24 }} />
+      <Button type="submit" disabled={!email.trim() || busy}>{busy ? 'Enviando…' : 'Mandar link'}</Button>
+    </form>
+  );
+}
+
+export function ResetPassword({ actions }: { actions: Actions }) {
+  const [password, setPassword] = useState('');
+  const { busy, error, onSubmit } = useSubmit(() => actions.resetPassword(password));
+
+  return (
+    <form className="screen" onSubmit={onSubmit}>
+      <BackButton onClick={() => actions.go('welcome')} />
+      <h1 className="title-m" style={{ marginTop: 16 }}>Criar senha nova</h1>
+      <p className="lead" style={{ margin: '8px 0 28px' }}>
+        Depois de salvar, você entra direto. Os outros aparelhos conectados à sua conta vão precisar entrar de novo.
+      </p>
+      <div className="fields">
+        <PasswordField id="f-pass-n" label="Senha nova" autoComplete="new-password" value={password} onChange={setPassword} hint="Pelo menos 8 caracteres." />
+        {error && (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        )}
+        {error && (
+          <button type="button" className="link-btn" onClick={() => actions.go('forgot')}>
+            Pedir um link novo
+          </button>
+        )}
+      </div>
+      <div className="spacer" style={{ minHeight: 24 }} />
+      <Button type="submit" disabled={password.length < 8 || busy}>{busy ? 'Salvando…' : 'Salvar e entrar'}</Button>
     </form>
   );
 }

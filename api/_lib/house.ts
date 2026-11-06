@@ -68,6 +68,8 @@ interface StoredUser {
   /** A casa em que a pessoa está, e o lugar dela lá. */
   house: { houseId: string; memberId: string } | null;
   createdAt: string;
+  /** Logins feitos antes deste momento (ms) não valem mais: a senha foi trocada. */
+  sessionsValidAfter?: number;
 }
 
 /** Sessão do formato antigo (antes das contas), guardada no aparelho. */
@@ -88,6 +90,8 @@ type Authed<T> = T & { token: string };
 export type Request =
   | { action: 'signup'; name: string; email: string; password: string; legacy?: LegacySession }
   | { action: 'login'; email: string; password: string; legacy?: LegacySession }
+  | { action: 'requestReset'; email: string }
+  | { action: 'resetPassword'; resetToken: string; password: string }
   | Authed<{ action: 'me' }>
   | Authed<{ action: 'logout' }>
   | Authed<{ action: 'createHouse'; houseName: string }>
@@ -119,6 +123,21 @@ const userKey = (id: string) => `lar:user:${id}`;
 const emailKey = (email: string) => `lar:email:${email}`;
 const sessionKey = (token: string) => `lar:session:${token}`;
 const attemptsKey = (email: string) => `lar:login-attempts:${email}`;
+const resetKey = (token: string) => `lar:reset:${token}`;
+const resetCountKey = (email: string) => `lar:reset-count:${email}`;
+
+const RESET_TTL_S = 60 * 60;
+const MAX_RESETS_PER_HOUR = 3;
+
+export interface Email { to: string; subject: string; text: string; html: string }
+
+/** O que muda entre a Vercel e o computador de desenvolvimento. */
+export interface Env {
+  /** Endereço do app, usado nos links dos e-mails. Nunca vem do pedido (evita links falsos). */
+  baseUrl: string;
+  /** Manda um e-mail; null se o envio não estiver configurado. */
+  sendEmail: ((email: Email) => Promise<void>) | null;
+}
 
 const SESSION_DAYS = 90;
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -273,16 +292,43 @@ const account = (u: StoredUser): Account => ({ name: u.name, email: u.email });
 
 async function newSession(store: Store, u: StoredUser): Promise<string> {
   const token = randomId(32);
-  await store.set(sessionKey(token), u.id, SESSION_DAYS * 86_400);
+  // Guarda quando o login foi feito, para poder invalidar logins antigos ao trocar a senha.
+  await store.set(sessionKey(token), `${u.id}|${Date.now()}`, SESSION_DAYS * 86_400);
   return token;
 }
 
 async function userFromToken(store: Store, token: unknown): Promise<StoredUser> {
   if (typeof token !== 'string' || !token) throw new HttpError(401, 'Entre na sua conta.');
-  const userId = await store.get(sessionKey(token));
+  const raw = await store.get(sessionKey(token));
+  const [userId, issued] = (raw ?? '').split('|');
   const u = userId ? await loadJson<StoredUser>(store, userKey(userId)) : null;
-  if (!u) throw new HttpError(401, 'Sua sessão expirou. Entre de novo.');
+  if (!u || (u.sessionsValidAfter && Number(issued ?? 0) < u.sessionsValidAfter)) {
+    throw new HttpError(401, 'Sua sessão expirou. Entre de novo.');
+  }
   return u;
+}
+
+/* ---------- recuperar senha ---------- */
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+function resetEmail(u: StoredUser, link: string): Email {
+  const name = escapeHtml(u.name);
+  return {
+    to: u.email,
+    subject: 'Lar: crie uma senha nova',
+    text:
+      `Olá, ${u.name}.\n\nAlguém pediu para trocar a senha da sua conta no Lar. ` +
+      `Para criar uma senha nova, abra este link (ele vale por 1 hora):\n\n${link}\n\n` +
+      'Se não foi você, ignore este e-mail: sua senha continua a mesma.',
+    html: `<div style="font-family:Inter,system-ui,sans-serif;color:#1C1C1A;max-width:480px;line-height:1.5">
+<p style="font-size:16px">Olá, ${name}.</p>
+<p style="font-size:16px">Alguém pediu para trocar a senha da sua conta no <strong>Lar</strong>. O link abaixo vale por 1 hora.</p>
+<p style="margin:28px 0"><a href="${escapeHtml(link)}" style="display:inline-block;background:#2B5BD7;color:#FFFFFF;text-decoration:none;font-weight:600;padding:14px 22px;border-radius:12px">Criar senha nova</a></p>
+<p style="font-size:14px;color:#57564F">Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>
+</div>`,
+  };
 }
 
 /**
@@ -330,9 +376,9 @@ async function reply(store: Store, u: StoredUser, token?: string): Promise<Respo
 
 /* ---------- ações ---------- */
 
-export async function handle(store: Store, req: Request): Promise<Response> {
+export async function handle(store: Store, req: Request, env: Env): Promise<Response> {
   try {
-    return await run(store, req);
+    return await run(store, req, env);
   } catch (e) {
     if (e instanceof HttpError) return { ok: false, status: e.status, error: e.message };
     console.error(e);
@@ -340,7 +386,7 @@ export async function handle(store: Store, req: Request): Promise<Response> {
   }
 }
 
-async function run(store: Store, req: Request): Promise<Response> {
+async function run(store: Store, req: Request, env: Env): Promise<Response> {
   switch (req?.action) {
     case 'signup': {
       const name = cleanText(req.name, 'seu nome', 40);
@@ -381,6 +427,49 @@ async function run(store: Store, req: Request): Promise<Response> {
       }
       await store.del(attemptsKey(email));
       await claimLegacy(store, u, req.legacy);
+      return reply(store, u, await newSession(store, u));
+    }
+
+    case 'requestReset': {
+      const email = cleanEmail(req.email);
+      if (!env.sendEmail) {
+        throw new HttpError(503, 'A recuperação de senha ainda não foi configurada neste app.');
+      }
+      const sent = Number((await store.get(resetCountKey(email))) ?? 0);
+      if (sent >= MAX_RESETS_PER_HOUR) {
+        throw new HttpError(429, 'Já mandamos alguns e-mails. Confira sua caixa de entrada e o spam, ou espere 1 hora.');
+      }
+      await store.set(resetCountKey(email), String(sent + 1), RESET_TTL_S);
+      const id = await store.get(emailKey(email));
+      const u = id ? await loadJson<StoredUser>(store, userKey(id)) : null;
+      // Responde igual exista ou não a conta, para não revelar quem usa o app.
+      if (u) {
+        const resetToken = randomId(32);
+        await store.set(resetKey(resetToken), u.id, RESET_TTL_S);
+        const link = `${env.baseUrl.replace(/\/$/, '')}/?reset=${resetToken}`;
+        try {
+          await env.sendEmail(resetEmail(u, link));
+        } catch (e) {
+          console.error(e);
+          throw new HttpError(502, 'Não foi possível mandar o e-mail agora. Tente de novo em alguns minutos.');
+        }
+      }
+      return { ok: true, account: null, view: null };
+    }
+
+    case 'resetPassword': {
+      const password = cleanPassword(req.password);
+      const resetToken = typeof req.resetToken === 'string' ? req.resetToken : '';
+      const userId = resetToken ? await store.get(resetKey(resetToken)) : null;
+      const u = userId ? await loadJson<StoredUser>(store, userKey(userId)) : null;
+      if (!u) throw new HttpError(410, 'Este link expirou ou já foi usado. Peça um novo.');
+      await store.del(resetKey(resetToken)); // o link só vale uma vez
+      u.salt = randomId(16);
+      u.passwordHash = await hashPassword(password, u.salt);
+      u.sessionsValidAfter = Date.now(); // desconecta os outros aparelhos
+      await saveUser(store, u);
+      await store.del(attemptsKey(u.email));
+      await new Promise((r) => setTimeout(r, 2)); // o login novo fica depois do corte
       return reply(store, u, await newSession(store, u));
     }
 

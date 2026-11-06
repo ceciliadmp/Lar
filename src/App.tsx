@@ -11,7 +11,7 @@ import {
   type HouseView,
   type Screen,
 } from './state';
-import { Home, Login, Signup } from './screens/Auth';
+import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Members } from './screens/Members';
@@ -29,6 +29,8 @@ export interface Actions {
   /** Os formulários recebem uma mensagem de erro, ou null se deu certo. */
   signup(name: string, email: string, password: string): Promise<string | null>;
   login(email: string, password: string): Promise<string | null>;
+  requestReset(email: string): Promise<string | null>;
+  resetPassword(password: string): Promise<string | null>;
   logout(): void;
   create(houseName: string): Promise<string | null>;
   join(code: string): Promise<string | null>;
@@ -41,12 +43,20 @@ export interface Actions {
   leave(): void;
 }
 
+/** Link do e-mail de recuperação: ?reset=… */
+function readResetToken(): string | null {
+  const t = new URLSearchParams(window.location.search).get('reset');
+  if (t) window.history.replaceState(null, '', window.location.pathname); // tira o código da barra de endereço
+  return t;
+}
+
 export default function App() {
+  const [resetToken] = useState(readResetToken);
   const [token, setToken] = useState<string | null>(loadToken);
   const [account, setAccount] = useState<Account | null>(null);
   const [view, setView] = useState<HouseView | null>(null);
-  const [booting, setBooting] = useState(!!token);
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const [booting, setBooting] = useState(!!token && !resetToken);
+  const [screen, setScreen] = useState<Screen>(resetToken ? 'reset' : 'welcome');
   const [filter, setFilter] = useState<Filter>('all');
   const [sheetOpen, setSheetOpen] = useState(false);
   const [fresh, setFresh] = useState(false);
@@ -161,6 +171,9 @@ export default function App() {
       attempt(async () => signedIn(await api({ action: 'signup', name, email, password, legacy: loadLegacy() }))),
     login: (email, password) =>
       attempt(async () => signedIn(await api({ action: 'login', email, password, legacy: loadLegacy() }))),
+    requestReset: (email) => attempt(async () => void (await api({ action: 'requestReset', email }))),
+    resetPassword: (password) =>
+      attempt(async () => signedIn(await api({ action: 'resetPassword', resetToken: resetToken ?? '', password }))),
     logout: () => {
       if (token) void api({ action: 'logout', token }).catch(() => undefined);
       signOut();
@@ -215,6 +228,8 @@ export default function App() {
           {screen === 'welcome' && <Welcome actions={actions} />}
           {screen === 'signup' && <Signup actions={actions} />}
           {screen === 'login' && <Login actions={actions} />}
+          {screen === 'forgot' && <Forgot actions={actions} />}
+          {screen === 'reset' && <ResetPassword actions={actions} />}
           {screen === 'home' && account && <Home account={account} actions={actions} />}
           {screen === 'create' && <CreateHouse actions={actions} />}
           {screen === 'join' && <JoinHouse actions={actions} />}
