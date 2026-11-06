@@ -15,8 +15,10 @@ export interface Actions {
   /** Retorna uma mensagem de erro, ou null se deu certo. */
   create(houseName: string, name: string): Promise<string | null>;
   join(code: string, name: string): Promise<string | null>;
-  toggleTask(id: number): void;
-  addTask(title: string, assignee: string | null): void;
+  /** `day` é a chave do dia marcado (para recorrentes, cada dia conta separado). */
+  toggleTask(id: number, day: string): void;
+  addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null): void;
+  deleteTask(id: number): void;
   removeMember(id: string): void;
   newCode(): void;
   leave(): void;
@@ -113,21 +115,30 @@ export default function App() {
         return (e as Error).message;
       }
     },
-    toggleTask: (id) => {
+    toggleTask: (id, day) => {
       if (!session || !view) return;
       // Marca na hora; a resposta do servidor confirma.
       setView({
         ...view,
-        tasks: view.tasks.map((t) =>
-          t.id === id ? { ...t, done: !t.done, doneBy: t.done ? null : view.meId } : t,
-        ),
+        tasks: view.tasks.map((t) => {
+          if (t.id !== id) return t;
+          const completions = { ...t.completions };
+          if (completions[day]) delete completions[day];
+          else completions[day] = view.meId;
+          return { ...t, completions };
+        }),
       });
-      void send({ action: 'toggleTask', session, taskId: id });
+      void send({ action: 'toggleTask', session, taskId: id, date: day });
     },
-    addTask: (title, assignee) => {
+    addTask: (title, assignee, date, repeat) => {
       if (!session) return;
       setSheetOpen(false);
-      void send({ action: 'addTask', session, title, assignee });
+      void send({ action: 'addTask', session, title, assignee, date, repeat });
+    },
+    deleteTask: (id) => {
+      if (!session || !view) return;
+      setView({ ...view, tasks: view.tasks.filter((t) => t.id !== id) });
+      void send({ action: 'deleteTask', session, taskId: id });
     },
     removeMember: (id) => session && void send({ action: 'removeMember', session, memberId: id }),
     newCode: () => session && void send({ action: 'newCode', session }),

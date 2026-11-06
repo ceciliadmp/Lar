@@ -12,13 +12,31 @@ export interface Store {
 export type Role = 'admin' | 'membro';
 
 interface StoredMember { id: string; name: string; role: Role; token: string }
+/**
+ * Uma tarefa é avulsa (tem `date`) ou se repete em dias da semana (tem `repeat`).
+ * Datas são 'AAAA-MM-DD' no fuso de quem usa o app.
+ */
 export interface Task {
   id: number;
   title: string;
   assignee: string | null;
   createdBy: string;
-  done: boolean;
-  doneBy: string | null;
+  /** Avulsa: o dia em que deve ser feita. */
+  date: string | null;
+  /** Recorrente: dias da semana, 0 = domingo … 6 = sábado. */
+  repeat: number[] | null;
+  /** Dia → quem fez. Avulsa usa a chave `date`; recorrente, uma chave por dia. */
+  completions: Record<string, string>;
+}
+
+/** Formato antigo (antes da agenda semanal), convertido ao carregar. */
+interface LegacyTask {
+  id: number;
+  title: string;
+  assignee: string | null;
+  createdBy: string;
+  done?: boolean;
+  doneBy?: string | null;
 }
 interface StoredHouse {
   id: string;
@@ -43,8 +61,16 @@ export type Request =
   | { action: 'create'; houseName: string; name: string }
   | { action: 'join'; code: string; name: string }
   | { action: 'get'; session: Session }
-  | { action: 'addTask'; session: Session; title: string; assignee: string | null }
-  | { action: 'toggleTask'; session: Session; taskId: number }
+  | {
+      action: 'addTask';
+      session: Session;
+      title: string;
+      assignee: string | null;
+      date: string | null;
+      repeat: number[] | null;
+    }
+  | { action: 'toggleTask'; session: Session; taskId: number; date: string }
+  | { action: 'deleteTask'; session: Session; taskId: number }
   | { action: 'removeMember'; session: Session; memberId: string }
   | { action: 'newCode'; session: Session }
   | { action: 'leave'; session: Session };
@@ -88,12 +114,62 @@ function cleanText(v: unknown, field: string, max: number): string {
   return v.trim().slice(0, max);
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const KEEP_DAYS = 30;
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function cleanDate(v: unknown): string {
+  if (typeof v !== 'string' || !DATE_RE.test(v) || Number.isNaN(Date.parse(v))) {
+    throw new HttpError(400, 'Data inválida.');
+  }
+  return v;
+}
+
+function cleanRepeat(v: unknown): number[] {
+  if (!Array.isArray(v)) throw new HttpError(400, 'Escolha os dias da semana.');
+  const days = [...new Set(v.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort();
+  if (!days.length) throw new HttpError(400, 'Escolha pelo menos um dia da semana.');
+  return days;
+}
+
+/** Converte tarefas do formato antigo (concluída sim/não, sem data). */
+function migrateTask(t: Task | LegacyTask): Task {
+  if ('completions' in t) return t;
+  const date = isoDate(new Date());
+  return {
+    id: t.id,
+    title: t.title,
+    assignee: t.assignee,
+    createdBy: t.createdBy,
+    date,
+    repeat: null,
+    completions: t.done && t.doneBy ? { [date]: t.doneBy } : {},
+  };
+}
+
+/** Esquece o que é antigo: conclusões com mais de 30 dias e avulsas feitas há mais de 30 dias. */
+function prune(h: StoredHouse) {
+  const cutoff = isoDate(new Date(Date.now() - KEEP_DAYS * 86_400_000));
+  h.tasks = h.tasks.filter((t) => !(t.date && t.date < cutoff && t.completions[t.date]));
+  for (const t of h.tasks) {
+    if (!t.repeat) continue;
+    for (const day of Object.keys(t.completions)) if (day < cutoff) delete t.completions[day];
+  }
+}
+
 async function load(store: Store, id: string): Promise<StoredHouse | null> {
   const raw = await store.get(houseKey(id));
-  return raw ? (JSON.parse(raw) as StoredHouse) : null;
+  if (!raw) return null;
+  const h = JSON.parse(raw) as StoredHouse;
+  h.tasks = (h.tasks as (Task | LegacyTask)[]).map(migrateTask);
+  return h;
 }
 
 async function save(store: Store, h: StoredHouse): Promise<void> {
+  prune(h);
   await store.set(houseKey(h.id), JSON.stringify(h));
 }
 
@@ -176,8 +252,10 @@ async function run(store: Store, req: Request): Promise<Response> {
       const { h, me } = await authorize(store, req.session);
       const title = cleanText(req.title, 'a tarefa', 120);
       const assignee = h.members.some((m) => m.id === req.assignee) ? req.assignee : null;
-      h.tasks.unshift({ id: h.nextTaskId++, title, assignee, createdBy: me.id, done: false, doneBy: null });
-      if (h.tasks.length > 500) h.tasks.length = 500;
+      const repeat = req.repeat != null ? cleanRepeat(req.repeat) : null;
+      const date = repeat ? null : cleanDate(req.date);
+      if (h.tasks.length >= 500) throw new HttpError(409, 'A casa já tem tarefas demais. Apague algumas.');
+      h.tasks.unshift({ id: h.nextTaskId++, title, assignee, createdBy: me.id, date, repeat, completions: {} });
       await save(store, h);
       return { ok: true, view: view(h, me.id) };
     }
@@ -185,9 +263,18 @@ async function run(store: Store, req: Request): Promise<Response> {
     case 'toggleTask': {
       const { h, me } = await authorize(store, req.session);
       const t = h.tasks.find((x) => x.id === req.taskId);
-      if (!t) throw new HttpError(404, 'Essa tarefa não existe mais.');
-      t.done = !t.done;
-      t.doneBy = t.done ? me.id : null;
+      if (!t) throw new HttpError(404, 'Essa tarefa foi apagada.');
+      // Avulsa: uma única conclusão. Recorrente: uma por dia.
+      const day = t.date ?? cleanDate(req.date);
+      if (t.completions[day]) delete t.completions[day];
+      else t.completions[day] = me.id;
+      await save(store, h);
+      return { ok: true, view: view(h, me.id) };
+    }
+
+    case 'deleteTask': {
+      const { h, me } = await authorize(store, req.session);
+      h.tasks = h.tasks.filter((x) => x.id !== req.taskId);
       await save(store, h);
       return { ok: true, view: view(h, me.id) };
     }
@@ -197,7 +284,7 @@ async function run(store: Store, req: Request): Promise<Response> {
       if (me.role !== 'admin') throw new HttpError(403, 'Só o administrador pode remover pessoas.');
       if (req.memberId === me.id) throw new HttpError(400, 'Use “Sair da casa” para sair.');
       h.members = h.members.filter((m) => m.id !== req.memberId);
-      h.tasks = h.tasks.map((t) => (t.assignee === req.memberId && !t.done ? { ...t, assignee: null } : t));
+      h.tasks = h.tasks.map((t) => (t.assignee === req.memberId ? { ...t, assignee: null } : t));
       await save(store, h);
       return { ok: true, view: view(h, me.id) };
     }
@@ -222,7 +309,7 @@ async function run(store: Store, req: Request): Promise<Response> {
       }
       // Se o administrador sai, quem entrou primeiro assume.
       if (me.role === 'admin' && !h.members.some((m) => m.role === 'admin')) h.members[0].role = 'admin';
-      h.tasks = h.tasks.map((t) => (t.assignee === me.id && !t.done ? { ...t, assignee: null } : t));
+      h.tasks = h.tasks.map((t) => (t.assignee === me.id ? { ...t, assignee: null } : t));
       await save(store, h);
       return { ok: true, view: null };
     }

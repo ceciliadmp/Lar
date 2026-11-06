@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Avatar, BackButton, Button, Icon } from '../components/ui';
 import type { Actions } from '../App';
-import { avatarFor, isAdmin, type HouseView } from '../state';
+import { avatarFor, dayKey, isAdmin, occurrencesOn, type HouseView } from '../state';
 
 export function Members({ view: s, actions }: { view: HouseView; actions: Actions }) {
   const [copied, setCopied] = useState(false);
   const admin = isAdmin(s);
+  const now = new Date();
+  const today = occurrencesOn(s.tasks, now, dayKey(now)).filter((o) => !o.doneBy);
 
   const copy = async () => {
     try {
@@ -48,7 +50,7 @@ export function Members({ view: s, actions }: { view: HouseView; actions: Action
 
       <ul className="list" style={{ marginTop: 20 }}>
         {s.members.map((m) => {
-          const pending = s.tasks.filter((t) => t.assignee === m.id && !t.done).length;
+          const pending = today.filter((o) => o.task.assignee === m.id).length;
           const role = m.role === 'admin' ? 'Administrador' : 'Membro';
           return (
             <li key={m.id} className="member">
@@ -56,7 +58,7 @@ export function Members({ view: s, actions }: { view: HouseView; actions: Action
               <div className="member__text">
                 <span className="member__name">{m.id === s.meId ? `${m.name} (você)` : m.name}</span>
                 <span className="caption">
-                  {role} · {pending === 1 ? '1 tarefa pendente' : `${pending} tarefas pendentes`}
+                  {role} · {pending === 0 ? 'nada para hoje' : pending === 1 ? '1 tarefa hoje' : `${pending} tarefas hoje`}
                 </span>
               </div>
               {admin && m.id !== s.meId && (

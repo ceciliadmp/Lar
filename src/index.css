@@ -156,9 +156,55 @@ h1, h2, p { margin: 0; }
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .task { display: flex; align-items: flex-start; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--line); }
-.task__check { flex-shrink: 0; width: 44px; height: 44px; margin: -9px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; }
-.task__circle { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--check-idle); display: flex; align-items: center; justify-content: center; }
-.task--done .task__circle { border-color: var(--accent); background: var(--accent); }
+.task__check {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -9px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Caixa de marcar: quadrada, cantos de 8px, nunca encolhe nem estica. */
+.task__box {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid var(--check-idle);
+  background: var(--surface);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.task--done .task__box { border-color: var(--accent); background: var(--accent); }
+.task > .avatar { margin-top: 0; }
+.task__delete { flex: none; margin: -9px -12px -9px -6px; color: var(--ink-3); }
+.task__delete:hover { color: var(--danger); }
+.task__repeat { display: inline-flex; vertical-align: -2px; margin-right: 6px; color: var(--ink-3); }
+.caption--late { color: var(--danger); }
+
+/* Seções por dia */
+.day { margin-top: 18px; }
+.day:first-child { margin-top: 6px; }
+.day__title { margin: 0 0 2px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.day__title span { font-weight: 500; color: var(--ink-3); }
+.day__empty { padding: 14px 0 6px; font-size: 14px; color: var(--ink-3); }
+
+/* Uma vez / Toda semana */
+.segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px; border-radius: 14px; background: var(--muted-fill); }
+.segmented button { height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink-2); }
+.segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(28, 28, 26, 0.12); }
+.weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.weekdays .chip { padding: 0; min-width: 0; height: 44px; border-radius: 12px; }
 .task__text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .task__title { font-size: 16px; line-height: 1.35; font-weight: 500; }
 .task--done .task__title { color: var(--ink-3); text-decoration: line-through; }
@@ -190,6 +236,8 @@ h1, h2, p { margin: 0; }
 .sheet { position: absolute; inset: 0; }
 .sheet__scrim { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--scrim); }
 .sheet__panel {
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
   position: absolute;
   left: 0;
   right: 0;
