@@ -206,12 +206,12 @@ h1, h2, p { margin: 0; }
 /* Título da home com o botão "Nova tarefa" à direita */
 .tasks__title { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .new-task-btn {
+  flex: none;
+  width: 44px;
   height: 44px;
-  margin-right: -12px;
-  padding: 0 12px;
+  padding: 0;
   border-radius: 12px;
-  color: var(--accent);
-  font-size: 15px;
+  color: var(--ink);
 }
 .new-task-btn:hover { background: var(--muted-fill); }
 

@@ -92,9 +92,8 @@ export function Tasks({
         </div>
         <div className="tasks__title">
           <h1 className="title-l">Tarefas</h1>
-          <Button variant="ghost" className="new-task-btn" onClick={() => actions.go('newTask')}>
-            <Icon name="plus" size={16} strokeWidth={2.4} />
-            Nova tarefa
+          <Button variant="secondary" className="new-task-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
+            <Icon name="plus" size={18} strokeWidth={2.2} />
           </Button>
         </div>
 
