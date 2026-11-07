@@ -41,6 +41,8 @@ export interface Task {
   completions: Record<string, string>;
   /** Quanto vale cada conclusão no placar: 1, 2 ou 3 (tarefas antigas: 1). */
   points?: number;
+  /** Recorrente: dias ('AAAA-MM-DD') excluídos só naquela data. */
+  skips?: string[];
 }
 
 /** Formato antigo (antes da agenda semanal), convertido ao carregar. */
@@ -165,6 +167,8 @@ export type Request =
     }>
   | Authed<{ action: 'toggleTask'; taskId: number; date: string }>
   | Authed<{ action: 'deleteTask'; taskId: number }>
+  /** Recorrente: some só no dia `date`; as outras repetições continuam. */
+  | Authed<{ action: 'skipOccurrence'; taskId: number; date: string }>
   | Authed<{ action: 'removeMember'; memberId: string }>
   | Authed<{ action: 'newCode' }>
   | Authed<{ action: 'setGame'; closingDay: number; reward: string }>
@@ -325,6 +329,7 @@ function prune(h: StoredHouse) {
   for (const t of h.tasks) {
     if (!t.repeat) continue;
     for (const day of Object.keys(t.completions)) if (day < cutoff) delete t.completions[day];
+    if (t.skips) t.skips = t.skips.filter((d) => d >= cutoff);
   }
   if (h.score) h.score = h.score.filter((e) => e.d >= cutoff);
 }
@@ -772,6 +777,18 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       const u = await userFromToken(store, req.token);
       const { h, me } = await requireHouse(store, u);
       h.tasks = h.tasks.filter((x) => x.id !== req.taskId);
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'skipOccurrence': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const t = h.tasks.find((x) => x.id === req.taskId);
+      if (!t) throw new HttpError(404, 'Essa tarefa foi apagada.');
+      if (!t.repeat) throw new HttpError(400, 'Essa tarefa não se repete.');
+      const day = cleanDate(req.date);
+      t.skips = [...new Set([...(t.skips ?? []), day])].sort();
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }

@@ -1,4 +1,6 @@
+import { useCallback, useState } from 'react';
 import { Avatar, Button, Icon, IconButton } from '../components/ui';
+import { ConfirmDialog } from '../components/Dialog';
 import type { Actions } from '../App';
 import {
   addDays,
@@ -9,6 +11,7 @@ import {
   longDate,
   nameOf,
   occurrencesOn,
+  shortDayLabel,
   shortDate,
   weekdayLong,
   type HouseView,
@@ -149,6 +152,14 @@ export function Tasks({
   );
 }
 
+/** "hoje", "amanhã" ou "seg 9" */
+function dayLabel(key: string): string {
+  const today = dayKey(new Date());
+  if (key === today) return 'hoje';
+  if (key === dayKey(addDays(new Date(), 1))) return 'amanhã';
+  return shortDayLabel(key);
+}
+
 const pts = (n: number) => (n === 1 ? '1 ponto' : `${n} pontos`);
 
 function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; actions: Actions }) {
@@ -161,12 +172,8 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
         .filter(Boolean)
         .join(' · ');
 
-  const remove = () => {
-    const msg = t.repeat
-      ? `Apagar “${t.title}”? Ela se repete (${describeRepeat(t.repeat)}) e vai sumir de todos os dias, para todo mundo.`
-      : `Apagar “${t.title}” para todo mundo?`;
-    if (window.confirm(msg)) actions.deleteTask(t.id);
-  };
+  const [confirming, setConfirming] = useState(false);
+  const close = useCallback(() => setConfirming(false), []);
 
   return (
     <li className={done ? 'task task--done' : 'task'}>
@@ -195,9 +202,54 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
         <span className={o.lateFrom ? 'caption caption--late' : 'caption'}>{meta}</span>
       </div>
       <Avatar info={avatarFor(s, done ? o.doneBy : t.assignee)} />
-      <IconButton label={`Apagar: ${t.title}`} className="task__delete" onClick={remove}>
+      <IconButton label={`Excluir: ${t.title}`} className="task__delete" onClick={() => setConfirming(true)}>
         <Icon name="trash" size={18} />
       </IconButton>
+      {confirming &&
+        (t.repeat ? (
+          <ConfirmDialog
+            title="Excluir tarefa que se repete?"
+            onCancel={close}
+            actions={[
+              {
+                label: `Excluir só esta (${dayLabel(o.key)})`,
+                variant: 'secondary',
+                onClick: () => {
+                  close();
+                  actions.skipOccurrence(t.id, o.key);
+                },
+              },
+              {
+                label: 'Excluir todas',
+                variant: 'danger',
+                onClick: () => {
+                  close();
+                  actions.deleteTask(t.id);
+                },
+              },
+            ]}
+          >
+            “{t.title}” se repete ({describeRepeat(t.repeat)}). Você pode excluir só a de {dayLabel(o.key)} ou todas as
+            repetições, para todo mundo da casa.
+          </ConfirmDialog>
+        ) : (
+          <ConfirmDialog
+            title="Excluir tarefa?"
+            onCancel={close}
+            actions={[
+              {
+                label: 'Excluir',
+                variant: 'danger',
+                onClick: () => {
+                  close();
+                  actions.deleteTask(t.id);
+                },
+              },
+            ]}
+          >
+            “{t.title}” vai sumir para todo mundo da casa.
+          </ConfirmDialog>
+        ))}
     </li>
   );
 }

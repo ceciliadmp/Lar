@@ -41,6 +41,8 @@ export interface Actions {
   toggleTask(id: number, day: string): void;
   addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null, points: number): void;
   deleteTask(id: number): void;
+  /** Tarefa que se repete: exclui só o dia `day`. */
+  skipOccurrence(id: number, day: string): void;
   removeMember(id: string): void;
   newCode(): void;
   /** Foto como data URL JPEG, ou null para remover. */
@@ -230,6 +232,14 @@ export default function App() {
       if (!token || !view) return;
       setView({ ...view, tasks: view.tasks.filter((t) => t.id !== id) });
       void send({ action: 'deleteTask', token, taskId: id });
+    },
+    skipOccurrence: (id, day) => {
+      if (!token || !view) return;
+      setView({
+        ...view,
+        tasks: view.tasks.map((t) => (t.id === id ? { ...t, skips: [...(t.skips ?? []), day] } : t)),
+      });
+      void send({ action: 'skipOccurrence', token, taskId: id, date: day });
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),

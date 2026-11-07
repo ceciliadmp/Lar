@@ -187,7 +187,7 @@ export function occurrencesOn(tasks: Task[], day: Date, today: string): Occurren
   const out: Occurrence[] = [];
   for (const t of tasks) {
     if (t.repeat) {
-      if (t.repeat.includes(day.getDay())) out.push({ task: t, key, doneBy: t.completions[key] ?? null, lateFrom: null });
+      if (t.repeat.includes(day.getDay()) && !t.skips?.includes(key)) out.push({ task: t, key, doneBy: t.completions[key] ?? null, lateFrom: null });
     } else if (t.date === key) {
       out.push({ task: t, key, doneBy: t.completions[key] ?? null, lateFrom: null });
     } else if (key === today && t.date && t.date < today && !t.completions[t.date]) {
@@ -195,6 +195,11 @@ export function occurrencesOn(tasks: Task[], day: Date, today: string): Occurren
     }
   }
   return out;
+}
+
+/** "seg 9" a partir de 'AAAA-MM-DD' */
+export function shortDayLabel(key: string): string {
+  return chipDate(parseDay(key));
 }
 
 /** "atrasada desde seg 9" */

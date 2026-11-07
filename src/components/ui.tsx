@@ -2,14 +2,14 @@ import type { ButtonHTMLAttributes, InputHTMLAttributes, Ref } from 'react';
 import type { AvatarInfo } from '../state';
 import { usePhoto } from '../photos';
 
-type Variant = 'primary' | 'secondary' | 'soft' | 'ghost' | 'danger-text';
+type Variant = 'primary' | 'secondary' | 'soft' | 'ghost' | 'danger' | 'danger-text';
 
 export function Button({
   variant = 'primary',
   size,
   className = '',
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm'; ref?: Ref<HTMLButtonElement> }) {
   const cls = ['btn', `btn--${variant}`, size && `btn--${size}`, className].filter(Boolean).join(' ');
   return <button type="button" className={cls} {...rest} />;
 }
