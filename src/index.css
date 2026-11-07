@@ -311,3 +311,63 @@ h1, h2, p { margin: 0; }
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Hoje / Amanhã / Semana */
+.segmented--3 { grid-template-columns: 1fr 1fr 1fr; }
+
+/* Pontos no topo da tela de tarefas */
+.tasks__top-actions { display: flex; align-items: center; gap: 4px; }
+.score-pill {
+  height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.score-pill span { color: var(--ink); }
+
+/* Placar */
+.section-title { margin: 28px 0 4px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+.reward {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 18px;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reward__label { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; opacity: 0.9; }
+.reward__text { font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+.reward__when { font-size: 13px; line-height: 1.4; opacity: 0.9; }
+.ranking { margin-top: 8px; }
+.rank { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.rank__pos { width: 24px; flex: none; font-size: 14px; font-weight: 700; color: var(--ink-3); }
+.rank__name { flex-grow: 1; min-width: 0; font-size: 16px; font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
+.rank__badge { font-size: 12px; font-weight: 600; color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
+.rank__pts { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank--lead .rank__pos { color: var(--accent); }
+.past { padding: 12px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 3px; }
+.past__winner { font-size: 15px; font-weight: 600; }
+.settings { margin-top: 28px; gap: 16px; }
+.select {
+  height: 52px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+}
+.select:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+.form-ok { font-size: 14px; color: #24513C; font-weight: 600; }

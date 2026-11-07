@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Chip, Icon, IconButton, TextField } from '../components/ui';
 import type { Actions } from '../App';
-import { addDays, chipDate, dayKey, WEEK_ORDER, weekdayShort, type HouseView } from '../state';
+import { dayKey, WEEK_ORDER, weekdayShort, type HouseView } from '../state';
 
 type Mode = 'once' | 'repeat';
 
@@ -10,14 +10,13 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('once');
-  const [date, setDate] = useState(dayKey(today));
   const [repeat, setRepeat] = useState<number[]>([today.getDay()]);
   const inputRef = useRef<HTMLInputElement>(null);
   const close = () => actions.closeSheet();
   const disabled = !title.trim() || (mode === 'repeat' && repeat.length === 0);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    inputRef.current?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -28,12 +27,6 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
     { id: null as string | null, label: 'Qualquer um' },
     ...s.members.map((m) => ({ id: m.id as string | null, label: m.id === s.meId ? 'Eu' : m.name })),
   ];
-
-  // Próximos 7 dias para tarefas avulsas.
-  const nextDays = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(today, i);
-    return { key: dayKey(d), label: i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : chipDate(d) };
-  });
 
   const toggleDay = (d: number) =>
     setRepeat((r) => (r.includes(d) ? r.filter((x) => x !== d) : [...r, d]));
@@ -49,7 +42,8 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
         onSubmit={(e) => {
           e.preventDefault();
           if (disabled) return;
-          actions.addTask(title.trim(), assignee, mode === 'once' ? date : null, mode === 'repeat' ? repeat : null);
+          // Avulsa é sempre para hoje.
+          actions.addTask(title.trim(), assignee, mode === 'once' ? dayKey(today) : null, mode === 'repeat' ? repeat : null);
         }}
       >
         <div className="sheet__grabber" aria-hidden="true" />
@@ -71,18 +65,10 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
         <div className="field" style={{ gap: 10 }}>
           <span className="field-label" id="when-label">Quando?</span>
           <div className="segmented" role="group" aria-labelledby="when-label">
-            <button type="button" aria-pressed={mode === 'once'} onClick={() => setMode('once')}>Uma vez</button>
+            <button type="button" aria-pressed={mode === 'once'} onClick={() => setMode('once')}>Só hoje</button>
             <button type="button" aria-pressed={mode === 'repeat'} onClick={() => setMode('repeat')}>Toda semana</button>
           </div>
-          {mode === 'once' ? (
-            <div className="chips" role="group" aria-label="Dia">
-              {nextDays.map((d) => (
-                <Chip key={d.key} pressed={date === d.key} onClick={() => setDate(d.key)}>
-                  {d.label}
-                </Chip>
-              ))}
-            </div>
-          ) : (
+          {mode === 'repeat' && (
             <div className="weekdays" role="group" aria-label="Dias da semana">
               {WEEK_ORDER.map((d) => (
                 <Chip key={d} pressed={repeat.includes(d)} onClick={() => toggleDay(d)}>

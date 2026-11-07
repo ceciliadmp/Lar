@@ -56,6 +56,51 @@ interface StoredHouse {
   members: StoredMember[];
   tasks: Task[];
   nextTaskId: number;
+  /** Fuso da casa (ex.: America/Sao_Paulo), para saber que dia é "hoje" no placar. */
+  timezone?: string;
+  /** Pontos: um registro por tarefa concluída (1 ponto cada). */
+  score?: ScoreEntry[];
+  /** Placar mensal; ausente = desligado. */
+  game?: StoredGame;
+}
+
+interface ScoreEntry {
+  /** Quem fez. */
+  m: string;
+  /** Dia em que fez (fuso da casa): é o dia que conta para a rodada. */
+  d: string;
+  /** Tarefa e dia da tarefa que foi marcada (para desfazer). */
+  t: number;
+  k: string;
+}
+
+interface StoredGame {
+  /** Dia do mês em que a rodada fecha (1–28), ou 0 = último dia do mês. */
+  closingDay: number;
+  reward: string;
+  /** Fim da última rodada já apurada. */
+  lastSettled: string;
+  history: RoundResult[];
+}
+
+export interface RoundResult {
+  start: string;
+  end: string;
+  reward: string;
+  /** Mais de um em caso de empate; vazio se ninguém pontuou. */
+  winners: { name: string; points: number }[];
+}
+
+export interface GameView {
+  closingDay: number;
+  reward: string;
+  /** Rodada atual. */
+  start: string;
+  end: string;
+  /** Hoje, no fuso da casa. */
+  today: string;
+  standings: { memberId: string; points: number }[];
+  history: RoundResult[];
 }
 
 interface StoredUser {
@@ -83,6 +128,7 @@ export interface HouseView {
   meId: string;
   members: { id: string; name: string; role: Role }[];
   tasks: Task[];
+  game: GameView | null;
 }
 
 type Authed<T> = T & { token: string };
@@ -94,13 +140,15 @@ export type Request =
   | { action: 'resetPassword'; resetToken: string; password: string }
   | Authed<{ action: 'me' }>
   | Authed<{ action: 'logout' }>
-  | Authed<{ action: 'createHouse'; houseName: string }>
+  | Authed<{ action: 'createHouse'; houseName: string; timezone?: string }>
   | Authed<{ action: 'joinHouse'; code: string }>
   | Authed<{ action: 'addTask'; title: string; assignee: string | null; date: string | null; repeat: number[] | null }>
   | Authed<{ action: 'toggleTask'; taskId: number; date: string }>
   | Authed<{ action: 'deleteTask'; taskId: number }>
   | Authed<{ action: 'removeMember'; memberId: string }>
   | Authed<{ action: 'newCode' }>
+  | Authed<{ action: 'setGame'; closingDay: number; reward: string }>
+  | Authed<{ action: 'stopGame' }>
   | Authed<{ action: 'leave' }>;
 
 export type Response =
@@ -203,7 +251,8 @@ function sameString(a: string, b: string): boolean {
 /* ---------- datas e tarefas ---------- */
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const KEEP_DAYS = 30;
+/** Guarda conclusões e pontos por 70 dias: cobre a rodada mensal com folga. */
+const KEEP_DAYS = 70;
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -238,7 +287,7 @@ function migrateTask(t: Task | LegacyTask): Task {
   };
 }
 
-/** Esquece o que é antigo: conclusões com mais de 30 dias e avulsas feitas há mais de 30 dias. */
+/** Esquece o que é antigo: conclusões, avulsas feitas e pontos com mais de 70 dias. */
 function prune(h: StoredHouse) {
   const cutoff = isoDate(new Date(Date.now() - KEEP_DAYS * 86_400_000));
   h.tasks = h.tasks.filter((t) => !(t.date && t.date < cutoff && t.completions[t.date]));
@@ -246,6 +295,109 @@ function prune(h: StoredHouse) {
     if (!t.repeat) continue;
     for (const day of Object.keys(t.completions)) if (day < cutoff) delete t.completions[day];
   }
+  if (h.score) h.score = h.score.filter((e) => e.d >= cutoff);
+}
+
+/* ---------- placar mensal ---------- */
+
+const DEFAULT_TZ = 'America/Sao_Paulo';
+
+function validTimezone(tz: unknown): string | null {
+  if (typeof tz !== 'string' || tz.length > 64) return null;
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+    return tz;
+  } catch {
+    return null;
+  }
+}
+
+/** Hoje ('AAAA-MM-DD') no fuso da casa. */
+function todayIn(h: StoredHouse): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: h.timezone ?? DEFAULT_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+const ymd = (y: number, m: number, d: number) =>
+  `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+function shiftDay(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const x = new Date(Date.UTC(y, m - 1, d + n));
+  return ymd(x.getUTCFullYear(), x.getUTCMonth() + 1, x.getUTCDate());
+}
+
+/** Dia de fechamento num mês (m de 1 a 12, pode passar de 12 ou ser 0). */
+function closingDate(y: number, m: number, closingDay: number): string {
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const yy = first.getUTCFullYear();
+  const mm = first.getUTCMonth() + 1;
+  const last = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  return ymd(yy, mm, closingDay === 0 ? last : Math.min(closingDay, last));
+}
+
+/** A rodada que contém `day`: do dia seguinte ao fechamento anterior até o próximo fechamento. */
+function roundOf(day: string, closingDay: number): { start: string; end: string } {
+  const [y, m] = day.split('-').map(Number);
+  let end = closingDate(y, m, closingDay);
+  let prev = closingDate(y, m - 1, closingDay);
+  if (day > end) {
+    prev = end;
+    end = closingDate(y, m + 1, closingDay);
+  }
+  return { start: shiftDay(prev, 1), end };
+}
+
+function standings(h: StoredHouse, start: string, end: string) {
+  const pts = new Map<string, number>();
+  for (const e of h.score ?? []) if (e.d >= start && e.d <= end) pts.set(e.m, (pts.get(e.m) ?? 0) + 1);
+  return h.members
+    .map((m) => ({ memberId: m.id, points: pts.get(m.id) ?? 0 }))
+    .sort((a, b) => b.points - a.points);
+}
+
+/** Fecha as rodadas que já acabaram (todas, mesmo se ninguém abriu o app). Retorna true se mudou algo. */
+function settleRound(h: StoredHouse): boolean {
+  const g = h.game;
+  if (!g) return false;
+  const prevEnd = shiftDay(roundOf(todayIn(h), g.closingDay).start, -1);
+  let changed = false;
+  for (let i = 0; i < 24 && g.lastSettled < prevEnd; i++) {
+    const r = roundOf(shiftDay(g.lastSettled, 1), g.closingDay);
+    const table = standings(h, r.start, r.end);
+    const top = table[0]?.points ?? 0;
+    const winners = top
+      ? table
+          .filter((x) => x.points === top)
+          .map((x) => ({ name: h.members.find((m) => m.id === x.memberId)!.name, points: x.points }))
+      : [];
+    g.history.unshift({ start: r.start, end: r.end, reward: g.reward, winners });
+    g.lastSettled = r.end;
+    changed = true;
+  }
+  if (g.lastSettled < prevEnd) g.lastSettled = prevEnd; // pausa muito longa: pula o resto
+  g.history.length = Math.min(g.history.length, 12);
+  return changed;
+}
+
+function gameView(h: StoredHouse): GameView | null {
+  const g = h.game;
+  if (!g) return null;
+  const today = todayIn(h);
+  const r = roundOf(today, g.closingDay);
+  return {
+    closingDay: g.closingDay,
+    reward: g.reward,
+    start: r.start,
+    end: r.end,
+    today,
+    standings: standings(h, r.start, r.end),
+    history: g.history,
+  };
 }
 
 /* ---------- leitura e gravação ---------- */
@@ -283,6 +435,7 @@ function view(h: StoredHouse, meId: string): HouseView {
     meId,
     members: h.members.map(({ id, name, role }) => ({ id, name, role })),
     tasks: h.tasks,
+    game: gameView(h),
   };
 }
 
@@ -344,6 +497,7 @@ async function houseOf(store: Store, u: StoredUser) {
     await saveUser(store, u);
     return null;
   }
+  if (settleRound(h)) await saveHouse(store, h);
   return { h, me };
 }
 
@@ -490,7 +644,15 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       const me: StoredMember = { id: randomId(8), name: u.name, role: 'admin', userId: u.id };
       const id = randomId();
       const code = await claimCode(store, id);
-      const h: StoredHouse = { id, name: houseName, code, members: [me], tasks: [], nextTaskId: 1 };
+      const h: StoredHouse = {
+        id,
+        name: houseName,
+        code,
+        members: [me],
+        tasks: [],
+        nextTaskId: 1,
+        timezone: validTimezone(req.timezone) ?? DEFAULT_TZ,
+      };
       await saveHouse(store, h);
       u.house = { houseId: id, memberId: me.id };
       await saveUser(store, u);
@@ -535,8 +697,15 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       if (!t) throw new HttpError(404, 'Essa tarefa foi apagada.');
       // Avulsa: uma única conclusão. Recorrente: uma por dia.
       const day = t.date ?? cleanDate(req.date);
-      if (t.completions[day]) delete t.completions[day];
-      else t.completions[day] = me.id;
+      h.score ??= [];
+      if (t.completions[day]) {
+        delete t.completions[day];
+        h.score = h.score.filter((e) => !(e.t === t.id && e.k === day));
+      } else {
+        t.completions[day] = me.id;
+        // 1 ponto para quem fez, no dia em que fez.
+        h.score.push({ m: me.id, d: todayIn(h), t: t.id, k: day });
+      }
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
@@ -568,6 +737,36 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       h.code = await claimCode(store, h.id);
       await saveHouse(store, h);
       await store.del(codeKey(old)); // o código antigo deixa de funcionar
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'setGame': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      if (me.role !== 'admin') throw new HttpError(403, 'Só o administrador pode mudar o placar.');
+      const closingDay = Number(req.closingDay);
+      if (!Number.isInteger(closingDay) || closingDay < 0 || closingDay > 28) {
+        throw new HttpError(400, 'Escolha um dia de 1 a 28, ou o último dia do mês.');
+      }
+      const reward = cleanText(req.reward, 'a recompensa', 120);
+      const changed = !h.game || h.game.closingDay !== closingDay;
+      h.game = {
+        closingDay,
+        reward,
+        // Ao ligar ou mudar o dia, nada de apurar rodadas passadas: começa a valer a rodada atual.
+        lastSettled: changed ? shiftDay(roundOf(todayIn(h), closingDay).start, -1) : h.game!.lastSettled,
+        history: h.game?.history ?? [],
+      };
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'stopGame': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      if (me.role !== 'admin') throw new HttpError(403, 'Só o administrador pode mudar o placar.');
+      delete h.game;
+      await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 

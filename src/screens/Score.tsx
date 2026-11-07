@@ -1,0 +1,179 @@
+import { useState } from 'react';
+import type { Actions } from '../App';
+import { Avatar, BackButton, Button, Icon, TextField } from '../components/ui';
+import { useSubmit } from '../useSubmit';
+import { avatarFor, daysUntil, isAdmin, shortDateKey, type GameView, type HouseView, type RoundResult } from '../state';
+
+const CLOSING_OPTIONS = [
+  ...Array.from({ length: 28 }, (_, i) => ({ value: i + 1, label: `Dia ${i + 1}` })),
+  { value: 0, label: 'Último dia do mês' },
+];
+
+const closingLabel = (d: number) => (d === 0 ? 'no último dia do mês' : `todo dia ${d}`);
+const pts = (n: number) => (n === 1 ? '1 ponto' : `${n} pontos`);
+
+export function Score({ view: s, actions }: { view: HouseView; actions: Actions }) {
+  const admin = isAdmin(s);
+  const g = s.game;
+
+  return (
+    <div className="screen members">
+      <BackButton label="Voltar para tarefas" onClick={() => actions.go('tasks')} />
+      <span className="eyebrow" style={{ marginTop: 16 }}>{s.house.name}</span>
+      <h1 className="title-m" style={{ marginTop: 4 }}>Placar</h1>
+
+      {g ? (
+        <>
+          <RewardCard game={g} />
+          <h2 className="section-title">Ranking do mês</h2>
+          <p className="caption">Cada tarefa concluída vale 1 ponto.</p>
+          <ol className="list ranking">
+            {g.standings.map((row, i) => {
+              const m = s.members.find((x) => x.id === row.memberId)!;
+              const leading = row.points > 0 && row.points === g.standings[0].points;
+              return (
+                <li key={row.memberId} className={leading ? 'rank rank--lead' : 'rank'}>
+                  <span className="rank__pos">{i + 1}º</span>
+                  <Avatar info={avatarFor(s, m.id)} size="lg" />
+                  <span className="rank__name">
+                    {m.id === s.meId ? `${m.name} (você)` : m.name}
+                    {leading && (
+                      <span className="rank__badge">
+                        <Icon name="trophy" size={14} /> na frente
+                      </span>
+                    )}
+                  </span>
+                  <span className="rank__pts">{row.points}</span>
+                </li>
+              );
+            })}
+          </ol>
+          {g.history.length > 0 && <History rounds={g.history} />}
+        </>
+      ) : (
+        <div className="card" style={{ marginTop: 24 }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>O placar está desligado</span>
+          <span className="lead" style={{ fontSize: 14 }}>
+            {admin
+              ? 'Ligue o placar para que cada tarefa concluída valha 1 ponto. No dia que você escolher, quem tiver mais pontos no mês ganha a recompensa.'
+              : 'Quem administra a casa pode ligar o placar e escolher uma recompensa para quem fizer mais tarefas no mês.'}
+          </span>
+        </div>
+      )}
+
+      {admin && <GameSettings game={g} actions={actions} />}
+    </div>
+  );
+}
+
+function RewardCard({ game: g }: { game: GameView }) {
+  const left = daysUntil(g.today, g.end);
+  const when =
+    left <= 0
+      ? 'Termina hoje! Quem estiver na frente no fim do dia ganha.'
+      : left === 1
+        ? 'Termina amanhã.'
+        : `Faltam ${left} dias.`;
+  return (
+    <div className="reward">
+      <span className="reward__label">
+        <Icon name="trophy" size={16} /> Prêmio do mês
+      </span>
+      <span className="reward__text">{g.reward}</span>
+      <span className="reward__when">
+        Rodada de {shortDateKey(g.start)} a {shortDateKey(g.end)} · {when}
+      </span>
+    </div>
+  );
+}
+
+function winnerText(r: RoundResult): string {
+  if (r.winners.length === 0) return 'Ninguém pontuou.';
+  if (r.winners.length === 1) return `${r.winners[0].name} venceu com ${pts(r.winners[0].points)}.`;
+  const names = r.winners.map((w) => w.name);
+  return `Empate: ${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}, com ${pts(r.winners[0].points)}.`;
+}
+
+function History({ rounds }: { rounds: RoundResult[] }) {
+  return (
+    <>
+      <h2 className="section-title">Rodadas anteriores</h2>
+      <ul className="list">
+        {rounds.map((r) => (
+          <li key={r.end} className="past">
+            <span className="caption">
+              {shortDateKey(r.start)} a {shortDateKey(r.end)}
+            </span>
+            <span className="past__winner">{winnerText(r)}</span>
+            <span className="caption">Prêmio: {r.reward}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+function GameSettings({ game: g, actions }: { game: GameView | null; actions: Actions }) {
+  const [closingDay, setClosingDay] = useState(g?.closingDay ?? 0);
+  const [reward, setReward] = useState(g?.reward ?? '');
+  const [saved, setSaved] = useState(false);
+  const { busy, error, onSubmit } = useSubmit(async () => {
+    setSaved(false);
+    const err = await actions.setGame(closingDay, reward.trim());
+    if (!err) setSaved(true);
+    return err;
+  });
+  const unchanged = !!g && g.closingDay === closingDay && g.reward === reward.trim();
+
+  return (
+    <form className="card settings" onSubmit={onSubmit}>
+      <span style={{ fontSize: 15, fontWeight: 600 }}>{g ? 'Configurar o placar' : 'Ligar o placar'}</span>
+      <div className="field">
+        <label htmlFor="f-closing">Dia da premiação</label>
+        <select
+          id="f-closing"
+          className="select"
+          value={closingDay}
+          onChange={(e) => {
+            setClosingDay(Number(e.target.value));
+            setSaved(false);
+          }}
+        >
+          {CLOSING_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <span className="caption">
+          A rodada fecha {closingLabel(closingDay)}. Contam os pontos desde o fechamento anterior.
+        </span>
+      </div>
+      <TextField
+        id="f-reward"
+        label="Recompensa"
+        placeholder="Ex.: escolhe o filme de sábado"
+        maxLength={120}
+        value={reward}
+        onChange={(e) => {
+          setReward(e.target.value);
+          setSaved(false);
+        }}
+      />
+      {error && <p className="form-error" role="alert">{error}</p>}
+      {saved && !error && (
+        <p className="form-ok" role="status">
+          Placar salvo.
+        </p>
+      )}
+      <Button type="submit" disabled={!reward.trim() || busy || unchanged}>
+        {busy ? 'Salvando…' : g ? 'Salvar' : 'Ligar placar'}
+      </Button>
+      {g && (
+        <Button variant="danger-text" style={{ height: 44, fontSize: 14 }} onClick={() => actions.stopGame()}>
+          Desligar placar
+        </Button>
+      )}
+    </form>
+  );
+}

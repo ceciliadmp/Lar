@@ -8,12 +8,14 @@ import {
   saveToken,
   type Account,
   type Filter,
+  type Period,
   type HouseView,
   type Screen,
 } from './state';
 import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
+import { Score } from './screens/Score';
 import { Members } from './screens/Members';
 import { NewTaskSheet } from './screens/NewTaskSheet';
 
@@ -24,6 +26,7 @@ type ApiResult = Awaited<ReturnType<typeof api>>;
 export interface Actions {
   go(screen: Screen): void;
   setFilter(f: Filter): void;
+  setPeriod(p: Period): void;
   openSheet(): void;
   closeSheet(): void;
   /** Os formulários recebem uma mensagem de erro, ou null se deu certo. */
@@ -40,6 +43,8 @@ export interface Actions {
   deleteTask(id: number): void;
   removeMember(id: string): void;
   newCode(): void;
+  setGame(closingDay: number, reward: string): Promise<string | null>;
+  stopGame(): void;
   leave(): void;
 }
 
@@ -58,6 +63,14 @@ export default function App() {
   const [booting, setBooting] = useState(!!token && !resetToken);
   const [screen, setScreen] = useState<Screen>(resetToken ? 'reset' : 'welcome');
   const [filter, setFilter] = useState<Filter>('all');
+  const [period, setPeriodState] = useState<Period>(() => {
+    try {
+      const p = localStorage.getItem('lar:period');
+      return p === 'tomorrow' || p === 'week' ? p : 'today';
+    } catch {
+      return 'today';
+    }
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [fresh, setFresh] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -71,7 +84,7 @@ export default function App() {
     setView(res.view);
     if (!res.view) {
       setSheetOpen(false);
-      setScreen((s) => (s === 'tasks' || s === 'members' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'members' || s === 'score' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -165,6 +178,14 @@ export default function App() {
       setScreen(s);
     },
     setFilter,
+    setPeriod: (p) => {
+      setPeriodState(p);
+      try {
+        localStorage.setItem('lar:period', p); // lembra a escolha neste aparelho
+      } catch {
+        /* ignora */
+      }
+    },
     openSheet: () => setSheetOpen(true),
     closeSheet: () => setSheetOpen(false),
     signup: (name, email, password) =>
@@ -179,7 +200,12 @@ export default function App() {
       signOut();
     },
     create: (houseName) =>
-      attempt(async () => enterHouse(await api({ action: 'createHouse', token: token!, houseName }), true)),
+      attempt(async () => enterHouse(await api({
+            action: 'createHouse',
+            token: token!,
+            houseName,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }), true)),
     join: (code) => attempt(async () => enterHouse(await api({ action: 'joinHouse', token: token!, code }), false)),
     toggleTask: (id, day) => {
       if (!token || !view) return;
@@ -208,6 +234,16 @@ export default function App() {
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),
+    setGame: (closingDay, reward) =>
+      attempt(async () => {
+        const res = await api({ action: 'setGame', token: token!, closingDay, reward });
+        apply(res);
+      }),
+    stopGame: () => {
+      if (!token) return;
+      if (!window.confirm('Desligar o placar? Os pontos continuam guardados, mas não há prêmio até ligar de novo.')) return;
+      void send({ action: 'stopGame', token });
+    },
     leave: () => {
       if (!token) return;
       if (!window.confirm('Sair desta casa? Para voltar, você vai precisar do código.')) return;
@@ -217,7 +253,7 @@ export default function App() {
     },
   };
 
-  const inHouse = screen === 'tasks' || screen === 'members';
+  const inHouse = screen === 'tasks' || screen === 'members' || screen === 'score';
 
   return (
     <main className="app">
@@ -234,7 +270,8 @@ export default function App() {
           {screen === 'create' && <CreateHouse actions={actions} />}
           {screen === 'join' && <JoinHouse actions={actions} />}
           {inHouse && !view && <div className="screen loading" aria-live="polite">Carregando a casa…</div>}
-          {screen === 'tasks' && view && <Tasks view={view} filter={filter} fresh={fresh} actions={actions} />}
+          {screen === 'tasks' && view && <Tasks view={view} filter={filter} period={period} fresh={fresh} actions={actions} />}
+          {screen === 'score' && view && <Score view={view} actions={actions} />}
           {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
           {screen === 'tasks' && view && sheetOpen && <NewTaskSheet view={view} actions={actions} />}
         </>

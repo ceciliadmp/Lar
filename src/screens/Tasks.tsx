@@ -9,31 +9,47 @@ import {
   longDate,
   nameOf,
   occurrencesOn,
+  shortDate,
+  weekdayLong,
   type Filter,
   type HouseView,
   type Occurrence,
+  type Period,
 } from '../state';
+
+const PERIODS: { id: Period; label: string }[] = [
+  { id: 'today', label: 'Hoje' },
+  { id: 'tomorrow', label: 'Amanhã' },
+  { id: 'week', label: 'Semana' },
+];
 
 export function Tasks({
   view: s,
   filter,
+  period,
   fresh,
   actions,
 }: {
   view: HouseView;
   filter: Filter;
+  period: Period;
   fresh: boolean;
   actions: Actions;
 }) {
   const me = s.meId;
   const now = new Date();
   const todayKey = dayKey(now);
-  const days = [
-    { label: 'Hoje', date: now },
-    { label: 'Amanhã', date: addDays(now, 1) },
-  ].map((d) => ({ ...d, items: occurrencesOn(s.tasks, d.date, todayKey) }));
 
-  const today = days[0].items;
+  // Hoje, amanhã, ou os próximos 7 dias a partir de hoje.
+  const offsets = period === 'today' ? [0] : period === 'tomorrow' ? [1] : [0, 1, 2, 3, 4, 5, 6];
+  const days = offsets.map((i) => {
+    const date = addDays(now, i);
+    const name = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : weekdayLong(date.getDay());
+    const sub = i <= 1 ? longDate(date) : shortDate(date);
+    return { key: dayKey(date), name, sub, items: occurrencesOn(s.tasks, date, todayKey) };
+  });
+
+  const today = occurrencesOn(s.tasks, now, todayKey);
   const doneToday = today.filter((o) => o.doneBy).length;
   const mineCount = days.reduce((n, d) => n + d.items.filter((o) => o.task.assignee === me && !o.doneBy).length, 0);
 
@@ -59,17 +75,29 @@ export function Tasks({
   const pct = today.length ? Math.round((doneToday / today.length) * 100) : 0;
   const showInvite = fresh && s.members.length === 1;
   const goMembers = () => actions.go('members');
+  const myPoints = s.game?.standings.find((x) => x.memberId === me)?.points ?? 0;
 
   return (
     <div className="tasks">
       <div className="tasks__head">
         <div className="tasks__top">
           <span className="eyebrow">{s.house.name}</span>
-          <button type="button" className="avatar-stack" aria-label="Membros da casa" onClick={goMembers}>
-            {s.members.slice(0, 3).map((m) => (
-              <Avatar key={m.id} info={avatarFor(s, m.id)} size="md" />
-            ))}
-          </button>
+          <div className="tasks__top-actions">
+            <button
+              type="button"
+              className="score-pill"
+              aria-label={s.game ? `Placar: você tem ${myPoints} ${myPoints === 1 ? 'ponto' : 'pontos'} este mês` : 'Placar'}
+              onClick={() => actions.go('score')}
+            >
+              <Icon name="trophy" size={18} />
+              {s.game && <span>{myPoints} pts</span>}
+            </button>
+            <button type="button" className="avatar-stack" aria-label="Membros da casa" onClick={goMembers}>
+              {s.members.slice(0, 3).map((m) => (
+                <Avatar key={m.id} info={avatarFor(s, m.id)} size="md" />
+              ))}
+            </button>
+          </div>
         </div>
         <h1 className="title-l" style={{ marginTop: 12 }}>Tarefas</h1>
         <div className="progress">
@@ -78,7 +106,14 @@ export function Tasks({
             <div className="progress__bar" style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <div className="chips" style={{ marginTop: 22, flexWrap: 'nowrap' }}>
+        <div className="segmented segmented--3" role="group" aria-label="Período" style={{ marginTop: 18 }}>
+          {PERIODS.map((p) => (
+            <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="chips" style={{ marginTop: 12, flexWrap: 'nowrap' }}>
           {filters.map((f) => (
             <Chip key={f.id} filter pressed={filter === f.id} onClick={() => actions.setFilter(f.id)}>
               {f.label}
@@ -110,9 +145,9 @@ export function Tasks({
           days.map((d) => {
             const list = applyFilter(d.items);
             return (
-              <section key={d.label} className="day" aria-labelledby={`day-${d.label}`}>
-                <h2 id={`day-${d.label}`} className="day__title">
-                  {d.label} <span>· {longDate(d.date)}</span>
+              <section key={d.key} className="day" aria-labelledby={`day-${d.key}`}>
+                <h2 id={`day-${d.key}`} className="day__title">
+                  {d.name} <span>· {d.sub}</span>
                 </h2>
                 {list.length === 0 ? (
                   <p className="day__empty">{emptyText}</p>

@@ -77,6 +77,13 @@ const PATHS: Record<string, ReactNode> = {
       <path d="M21 13v1a4 4 0 0 1-4 4H3" />
     </>
   ),
+  trophy: (
+    <>
+      <path d="M8 21h8M12 17v4" />
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
+      <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16" />

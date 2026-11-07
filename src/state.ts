@@ -1,7 +1,9 @@
-import type { Account, HouseView, LegacySession, Request, Response, Task } from '../api/_lib/house';
+import type { Account, GameView, HouseView, LegacySession, Request, Response, RoundResult, Task } from '../api/_lib/house';
 
-export type { Account, HouseView, Task };
-export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'members';
+export type { Account, GameView, HouseView, RoundResult, Task };
+export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'members' | 'score';
+/** O que a tela de tarefas mostra. */
+export type Period = 'today' | 'tomorrow' | 'week';
 export type Filter = 'all' | 'mine' | 'done';
 
 /* ---------- API ---------- */
@@ -130,6 +132,27 @@ function parseDay(key: string): Date {
 /** "quarta, 11 nov" */
 export function longDate(d: Date): string {
   return `${WEEKDAY_LONG[d.getDay()]}, ${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+/** "9 nov" */
+export function shortDate(d: Date): string {
+  return `${d.getDate()} ${MONTH_SHORT[d.getMonth()]}`;
+}
+
+/** "Segunda" */
+export function weekdayLong(day: number): string {
+  const w = WEEKDAY_LONG[day];
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/** "11 nov" a partir de 'AAAA-MM-DD' */
+export function shortDateKey(key: string): string {
+  return shortDate(parseDay(key));
+}
+
+/** Dias entre hoje e uma data 'AAAA-MM-DD' (0 = hoje). */
+export function daysUntil(fromKey: string, toKey: string): number {
+  return Math.round((parseDay(toKey).getTime() - parseDay(fromKey).getTime()) / 86_400_000);
 }
 
 /** "sex 13" */
