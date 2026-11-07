@@ -66,8 +66,10 @@ interface StoredHouse {
   timezone?: string;
   /** Pontos: um registro por tarefa concluída (1 ponto cada). */
   score?: ScoreEntry[];
-  /** Placar mensal; ausente = desligado. */
+  /** Placar com prêmio; ausente = sem prêmio. */
   game?: StoredGame;
+  /** Pontos tirados (guardados por 70 dias). */
+  penalties?: Penalty[];
 }
 
 interface ScoreEntry {
@@ -78,12 +80,29 @@ interface ScoreEntry {
   /** Tarefa e dia da tarefa que foi marcada (para desfazer). */
   t: number;
   k: string;
-  /** Pontos ganhos (registros antigos: 1). */
+  /** Pontos ganhos (registros antigos: 1); -1 quando alguém tirou um ponto. */
   p?: number;
 }
 
+/** Alguém tirou 1 ponto de outra pessoa, com uma justificativa. */
+export interface Penalty {
+  id: string;
+  /** Quem tirou e de quem tirou (ids de membro). */
+  from: string;
+  to: string;
+  reason: string;
+  /** Dia em que aconteceu (fuso da casa). */
+  d: string;
+  /** A pessoa que perdeu o ponto já fechou o aviso na home. */
+  dismissed?: boolean;
+}
+
+export type GamePeriod = 'monthly' | 'biweekly';
+
 interface StoredGame {
-  /** Dia do mês em que a rodada fecha (1–28), ou 0 = último dia do mês. */
+  /** Mensal (padrão) ou quinzenal: rodadas de 1 a 15 e de 16 ao fim do mês. */
+  period?: GamePeriod;
+  /** Mensal: dia do mês em que a rodada fecha (1–28), ou 0 = último dia do mês. */
   closingDay: number;
   reward: string;
   /** Fim da última rodada já apurada. */
@@ -105,6 +124,7 @@ export interface RoundResult {
  */
 export interface GameView {
   enabled: boolean;
+  period: GamePeriod;
   closingDay: number;
   reward: string;
   /** Rodada atual. */
@@ -146,6 +166,7 @@ export interface HouseView {
   members: { id: string; name: string; role: Role; photo: string | null }[];
   tasks: Task[];
   game: GameView;
+  penalties: Penalty[];
 }
 
 type Authed<T> = T & { token: string };
@@ -183,7 +204,11 @@ export type Request =
   | Authed<{ action: 'skipOccurrence'; taskId: number; date: string }>
   | Authed<{ action: 'removeMember'; memberId: string }>
   | Authed<{ action: 'newCode' }>
-  | Authed<{ action: 'setGame'; closingDay: number; reward: string }>
+  | Authed<{ action: 'setGame'; period?: GamePeriod; closingDay: number; reward: string }>
+  /** Tira 1 ponto de outra pessoa da casa, com justificativa curta. */
+  | Authed<{ action: 'takePoint'; memberId: string; reason: string }>
+  /** A pessoa fecha o aviso de ponto perdido na home. */
+  | Authed<{ action: 'dismissPenalty'; penaltyId: string }>
   | Authed<{ action: 'stopGame' }>
   /** `photo`: data URL JPEG, ou null para remover. */
   | Authed<{ action: 'setPhoto'; photo: string | null }>
@@ -349,6 +374,7 @@ function prune(h: StoredHouse) {
     if (t.skips) t.skips = t.skips.filter((d) => d >= cutoff);
   }
   if (h.score) h.score = h.score.filter((e) => e.d >= cutoff);
+  if (h.penalties) h.penalties = h.penalties.filter((x) => x.d >= cutoff);
 }
 
 /* ---------- placar mensal ---------- */
@@ -393,9 +419,24 @@ function closingDate(y: number, m: number, closingDay: number): string {
   return ymd(yy, mm, closingDay === 0 ? last : Math.min(closingDay, last));
 }
 
-/** A rodada que contém `day`: do dia seguinte ao fechamento anterior até o próximo fechamento. */
-function roundOf(day: string, closingDay: number): { start: string; end: string } {
-  const [y, m] = day.split('-').map(Number);
+interface RoundRule {
+  period?: GamePeriod;
+  closingDay: number;
+}
+
+/**
+ * A rodada que contém `day`.
+ * Quinzenal: de 1 a 15, ou de 16 ao último dia do mês.
+ * Mensal: do dia seguinte ao fechamento anterior até o próximo fechamento.
+ */
+function roundOf(day: string, rule: RoundRule): { start: string; end: string } {
+  const [y, m, d] = day.split('-').map(Number);
+  if (rule.period === 'biweekly') {
+    return d <= 15
+      ? { start: ymd(y, m, 1), end: ymd(y, m, 15) }
+      : { start: ymd(y, m, 16), end: closingDate(y, m, 0) };
+  }
+  const closingDay = rule.closingDay;
   let end = closingDate(y, m, closingDay);
   let prev = closingDate(y, m - 1, closingDay);
   if (day > end) {
@@ -417,10 +458,10 @@ function standings(h: StoredHouse, start: string, end: string) {
 function settleRound(h: StoredHouse): boolean {
   const g = h.game;
   if (!g) return false;
-  const prevEnd = shiftDay(roundOf(todayIn(h), g.closingDay).start, -1);
+  const prevEnd = shiftDay(roundOf(todayIn(h), g).start, -1);
   let changed = false;
   for (let i = 0; i < 24 && g.lastSettled < prevEnd; i++) {
-    const r = roundOf(shiftDay(g.lastSettled, 1), g.closingDay);
+    const r = roundOf(shiftDay(g.lastSettled, 1), g);
     const table = standings(h, r.start, r.end);
     const top = table[0]?.points ?? 0;
     const winners = top
@@ -441,9 +482,11 @@ function gameView(h: StoredHouse): GameView {
   const g = h.game;
   const today = todayIn(h);
   const closingDay = g?.closingDay ?? 0;
-  const r = roundOf(today, closingDay);
+  const period = g?.period ?? 'monthly';
+  const r = roundOf(today, { period, closingDay });
   return {
     enabled: !!g,
+    period,
     closingDay,
     reward: g?.reward ?? '',
     start: r.start,
@@ -490,6 +533,7 @@ function view(h: StoredHouse, meId: string): HouseView {
     members: h.members.map(({ id, name, role, userId, photo }) => ({ id, name, role, photo: photoUrl(userId, photo) })),
     tasks: h.tasks,
     game: gameView(h),
+    penalties: h.penalties ?? [],
   };
 }
 
@@ -877,16 +921,48 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       if (!Number.isInteger(closingDay) || closingDay < 0 || closingDay > 28) {
         throw new HttpError(400, 'Escolha um dia de 1 a 28, ou o último dia do mês.');
       }
+      const period: GamePeriod = req.period === 'biweekly' ? 'biweekly' : 'monthly';
       const reward = cleanText(req.reward, 'a recompensa', 120);
-      const changed = !h.game || h.game.closingDay !== closingDay;
+      const changed =
+        !h.game || (h.game.period ?? 'monthly') !== period || (period === 'monthly' && h.game.closingDay !== closingDay);
       h.game = {
+        period,
         closingDay,
         reward,
-        // Ao ligar ou mudar o dia, nada de apurar rodadas passadas: começa a valer a rodada atual.
-        lastSettled: changed ? shiftDay(roundOf(todayIn(h), closingDay).start, -1) : h.game!.lastSettled,
+        // Ao ligar ou mudar as rodadas, nada de apurar rodadas passadas: começa a valer a rodada atual.
+        lastSettled: changed ? shiftDay(roundOf(todayIn(h), { period, closingDay }).start, -1) : h.game!.lastSettled,
         history: h.game?.history ?? [],
       };
       await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'takePoint': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const target = h.members.find((m) => m.id === req.memberId);
+      if (!target) throw new HttpError(404, 'Essa pessoa não está mais na casa.');
+      if (target.id === me.id) throw new HttpError(400, 'Você não pode tirar ponto de si mesmo.');
+      const reason = cleanText(req.reason, 'o motivo', 120);
+      const g = gameView(h);
+      const current = g.standings.find((x) => x.memberId === target.id)?.points ?? 0;
+      if (current < 1) throw new HttpError(409, `${target.name} não tem pontos nesta rodada.`);
+      const id = randomId(6);
+      const d = todayIn(h);
+      h.penalties = [{ id, from: me.id, to: target.id, reason, d }, ...(h.penalties ?? [])].slice(0, 200);
+      h.score = [...(h.score ?? []), { m: target.id, d, t: 0, k: `pen:${id}`, p: -1 }];
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'dismissPenalty': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const pen = h.penalties?.find((x) => x.id === req.penaltyId && x.to === me.id);
+      if (pen && !pen.dismissed) {
+        pen.dismissed = true;
+        await saveHouse(store, h);
+      }
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 

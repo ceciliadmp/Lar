@@ -451,3 +451,19 @@ h1, h2, p { margin: 0; }
 }
 .row-menu__item:hover, .row-menu__item:focus-visible { background: var(--muted-fill); outline: none; }
 .row-menu__item--danger { color: var(--danger); }
+
+/* Aviso de ponto perdido na home */
+.penalty {
+  margin-bottom: 12px;
+  padding: 12px 4px 12px 16px;
+  border: 1px solid #f2d4cf;
+  border-radius: 14px;
+  background: #fdf1ef;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.penalty__text { flex-grow: 1; min-width: 0; padding-top: 2px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+.penalty__text strong { font-size: 15px; font-weight: 700; color: var(--danger); }
+.penalty__close { flex: none; margin: -8px 0; color: var(--ink-2); border-radius: 10px; }
+.penalty__close:hover { background: #f7e1dd; }

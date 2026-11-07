@@ -9,6 +9,7 @@ import {
   saveLastEmail,
   saveToken,
   type Account,
+  type GamePeriod,
   type Period,
   type HouseView,
   type Screen,
@@ -58,7 +59,11 @@ export interface Actions {
   newCode(): void;
   /** Foto como data URL JPEG, ou null para remover. */
   setPhoto(photo: string | null): Promise<string | null>;
-  setGame(closingDay: number, reward: string): Promise<string | null>;
+  setGame(period: GamePeriod, closingDay: number, reward: string): Promise<string | null>;
+  /** Tira 1 ponto de outra pessoa; retorna a mensagem de erro, ou null. */
+  takePoint(memberId: string, reason: string): Promise<string | null>;
+  /** Fecha o aviso de ponto perdido na home. */
+  dismissPenalty(id: string): void;
   stopGame(): void;
   leave(): void;
 }
@@ -276,11 +281,21 @@ export default function App() {
         const res = await api({ action: 'setPhoto', token: token!, photo });
         apply(res);
       }),
-    setGame: (closingDay, reward) =>
+    setGame: (period, closingDay, reward) =>
       attempt(async () => {
-        const res = await api({ action: 'setGame', token: token!, closingDay, reward });
+        const res = await api({ action: 'setGame', token: token!, period, closingDay, reward });
         apply(res);
       }),
+    takePoint: (memberId, reason) =>
+      attempt(async () => {
+        const res = await api({ action: 'takePoint', token: token!, memberId, reason });
+        apply(res);
+      }),
+    dismissPenalty: (id) => {
+      if (!token || !view) return;
+      setView({ ...view, penalties: view.penalties.map((x) => (x.id === id ? { ...x, dismissed: true } : x)) });
+      void send({ action: 'dismissPenalty', token, penaltyId: id });
+    },
     stopGame: () => {
       if (!token) return;
       if (!window.confirm('Tirar o prêmio do mês? Os pontos continuam valendo e aparecendo para todos.')) return;

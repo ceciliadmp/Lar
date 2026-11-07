@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Avatar, Button, Icon } from '../components/ui';
+import { Avatar, Button, Icon, IconButton } from '../components/ui';
 import { RowMenu } from '../components/Menu';
 import { ConfirmDialog } from '../components/Dialog';
 import type { Actions } from '../App';
@@ -62,7 +62,7 @@ export function Tasks({
 
   const table = s.game.standings;
   const scoreLabel =
-    'Placar do mês: ' +
+    'Placar: ' +
     table
       .map((row) => {
         const name = row.memberId === s.meId ? 'você' : (s.members.find((m) => m.id === row.memberId)?.name ?? '');
@@ -111,6 +111,22 @@ export function Tasks({
       </div>
 
       <div className="tasks__body">
+        {/* Avisos de ponto perdido: ficam até a pessoa fechar. */}
+        {s.penalties
+          .filter((p) => p.to === s.meId && !p.dismissed)
+          .map((p) => (
+            <div key={p.id} className="penalty" role="status">
+              <div className="penalty__text">
+                <strong>Você perdeu 1 ponto</strong>
+                <span>
+                  {nameOf(s, p.from)} tirou 1 ponto seu: “{p.reason}”
+                </span>
+              </div>
+              <IconButton label="Fechar aviso" className="penalty__close" onClick={() => actions.dismissPenalty(p.id)}>
+                <Icon name="close" size={16} />
+              </IconButton>
+            </div>
+          ))}
         {showInvite && (
           <div className="card" style={{ marginBottom: 12 }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>Sua casa está pronta</span>

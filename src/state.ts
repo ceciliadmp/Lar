@@ -1,6 +1,17 @@
-import type { Account, GameView, HouseView, LegacySession, Request, Response, RoundResult, Task } from '../api/_lib/house';
+import type {
+  Account,
+  GamePeriod,
+  GameView,
+  HouseView,
+  LegacySession,
+  Penalty,
+  Request,
+  Response,
+  RoundResult,
+  Task,
+} from '../api/_lib/house';
 
-export type { Account, GameView, HouseView, RoundResult, Task };
+export type { Account, GamePeriod, GameView, HouseView, Penalty, RoundResult, Task };
 export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'editTask' | 'members' | 'score' | 'profile';
 /** O que a tela de tarefas mostra. */
 export type Period = 'today' | 'week' | 'all';
