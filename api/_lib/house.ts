@@ -204,6 +204,8 @@ export type Request =
   | Authed<{ action: 'skipOccurrence'; taskId: number; date: string }>
   | Authed<{ action: 'removeMember'; memberId: string }>
   | Authed<{ action: 'newCode' }>
+  /** Só o admin: muda o nome da casa. */
+  | Authed<{ action: 'renameHouse'; name: string }>
   | Authed<{ action: 'setGame'; period?: GamePeriod; closingDay: number; reward: string }>
   /** Tira 1 ponto de outra pessoa da casa, com justificativa curta. */
   | Authed<{ action: 'takePoint'; memberId: string; reason: string }>
@@ -898,6 +900,15 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       if (req.memberId === me.id) throw new HttpError(400, 'Use “Sair da casa” para sair.');
       h.members = h.members.filter((m) => m.id !== req.memberId);
       h.tasks = h.tasks.map((t) => (t.assignee === req.memberId ? { ...t, assignee: null } : t));
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'renameHouse': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      if (me.role !== 'admin') throw new HttpError(403, 'Só o administrador pode mudar o nome da casa.');
+      h.name = cleanText(req.name, 'o nome da casa', 60);
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }

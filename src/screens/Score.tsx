@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { Actions } from '../App';
-import { Avatar, BackButton, Button, TextField } from '../components/ui';
+import { Avatar, Button, TextField } from '../components/ui';
 import { ConfirmDialog } from '../components/Dialog';
 import { useSubmit } from '../useSubmit';
 import {
@@ -33,10 +33,9 @@ export function Score({ view: s, actions }: { view: HouseView; actions: Actions 
   const taken = s.penalties.slice(0, 10);
 
   return (
-    <div className="screen members">
-      <BackButton label="Voltar para tarefas" onClick={() => actions.go('tasks')} />
-      <span className="eyebrow" style={{ marginTop: 16 }}>{s.house.name}</span>
-      <h1 className="title-m" style={{ marginTop: 4 }}>Placar</h1>
+    <div className="screen tab-screen">
+      <h1 className="title-l">Placar</h1>
+      <p className="tasks__subtitle">{s.house.name}</p>
 
       {g.enabled ? (
         <RewardCard game={g} />

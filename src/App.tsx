@@ -3,6 +3,7 @@ import {
   ApiError,
   api,
   avatarFor,
+  isTabScreen,
   clearLegacy,
   loadLegacy,
   loadToken,
@@ -20,7 +21,8 @@ import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
 import { Button, Icon } from './components/ui';
 import { clearPhotos } from './photos';
-import { Members } from './screens/Members';
+import { Settings } from './screens/Settings';
+import { TabBar } from './components/TabBar';
 import { NewTask } from './screens/NewTask';
 import { Profile } from './screens/Profile';
 
@@ -57,6 +59,8 @@ export interface Actions {
   skipOccurrence(id: number, day: string): void;
   removeMember(id: string): void;
   newCode(): void;
+  /** Só o admin: muda o nome da casa. */
+  renameHouse(name: string): Promise<string | null>;
   /** Foto como data URL JPEG, ou null para remover. */
   setPhoto(photo: string | null): Promise<string | null>;
   setGame(period: GamePeriod, closingDay: number, reward: string): Promise<string | null>;
@@ -103,7 +107,7 @@ export default function App() {
     setAccount(res.account);
     setView(res.view);
     if (!res.view) {
-      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'members' || s === 'score' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'settings' || s === 'score' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -276,6 +280,11 @@ export default function App() {
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),
+    renameHouse: (name) =>
+      attempt(async () => {
+        const res = await api({ action: 'renameHouse', token: token!, name });
+        apply(res);
+      }),
     setPhoto: (photo) =>
       attempt(async () => {
         const res = await api({ action: 'setPhoto', token: token!, photo });
@@ -310,7 +319,8 @@ export default function App() {
     },
   };
 
-  const inHouse = ['tasks', 'newTask', 'editTask', 'members', 'score'].includes(screen);
+  const inHouse = ['tasks', 'newTask', 'editTask', 'settings', 'score'].includes(screen);
+  const tab = view && isTabScreen(screen) ? screen : null;
   const editing = view?.tasks.find((t) => t.id === editingId) ?? null;
 
   return (
@@ -328,9 +338,16 @@ export default function App() {
           {screen === 'create' && <CreateHouse actions={actions} />}
           {screen === 'join' && <JoinHouse actions={actions} />}
           {inHouse && !view && <div className="screen loading" aria-live="polite">Carregando a casa…</div>}
-          {screen === 'tasks' && view && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
-          {screen === 'score' && view && <Score view={view} actions={actions} />}
-          {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
+          {tab && view && (
+            <div className="tab-layout">
+              <div className="tab-layout__content">
+                {tab === 'tasks' && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
+                {tab === 'score' && <Score view={view} actions={actions} />}
+                {tab === 'settings' && account && <Settings view={view} account={account} actions={actions} />}
+              </div>
+              <TabBar current={tab} onGo={(s) => actions.go(s)} />
+            </div>
+          )}
           {screen === 'newTask' && view && <NewTask view={view} actions={actions} />}
           {screen === 'editTask' && view && editing && <NewTask key={editing.id} view={view} task={editing} actions={actions} />}
           {screen === 'editTask' && view && !editing && (
@@ -345,7 +362,6 @@ export default function App() {
             <Profile
               account={account}
               avatar={view ? avatarFor(view, view.meId) : { bg: '#DDE3F0', fg: '#2C3F6B', initial: account.name.charAt(0).toUpperCase() }}
-              inHouse={!!view}
               actions={actions}
             />
           )}

@@ -58,7 +58,7 @@ export function Tasks({
     [...items].sort((a, b) => Number(!!a.doneBy) - Number(!!b.doneBy) || Number(!a.lateFrom) - Number(!b.lateFrom));
 
   const showInvite = fresh && s.members.length === 1;
-  const goMembers = () => actions.go('members');
+  const goMembers = () => actions.go('settings');
 
   const table = s.game.standings;
   const scoreLabel =
@@ -77,13 +77,13 @@ export function Tasks({
           <Button
             variant="secondary"
             className="square-btn"
-            aria-label={`Membros e convite de ${s.house.name}`}
+            aria-label={`Membros e convite de ${s.house.name} (Configurações)`}
             onClick={goMembers}
           >
             <Icon name="users" size={18} />
           </Button>
-          {/* Pontos do mês de cada pessoa, à esquerda da foto; toque para ver o placar. */}
-          <button type="button" className="score-mini" aria-label={scoreLabel} onClick={() => actions.go('score')}>
+          {/* Pontos de cada pessoa, à esquerda da foto (só para ver; o placar fica na aba Placar). */}
+          <div className="score-mini" role="img" aria-label={scoreLabel}>
             {table.slice(0, STRIP_MAX).map((row) => (
               <span key={row.memberId} className="score-mini__person" aria-hidden="true">
                 <strong>{row.points}</strong>
@@ -95,7 +95,7 @@ export function Tasks({
                 +{table.length - STRIP_MAX}
               </span>
             )}
-          </button>
+          </div>
         </div>
         <div className="tasks__title">
           <div className="tasks__heading">

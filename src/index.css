@@ -369,16 +369,11 @@ h1, h2, p { margin: 0; }
 .score-mini {
   flex: none;
   height: 44px;
-  margin-right: -8px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 22px;
-  background: transparent;
+  padding: 0;
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.score-mini:hover { background: var(--muted-fill); }
 .score-mini__person { display: flex; align-items: center; gap: 4px; }
 .score-mini__person strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .score-mini__more { font-size: 13px; font-weight: 600; color: var(--ink-3); }
@@ -468,3 +463,44 @@ h1, h2, p { margin: 0; }
 .penalty__text strong { font-size: 15px; font-weight: 700; color: var(--danger); }
 .penalty__close { flex: none; margin: -8px 0; color: var(--ink-2); border-radius: 10px; }
 .penalty__close:hover { background: #f7e1dd; }
+
+/* Barra de abas (Tarefas, Placar, Configurações) */
+.tab-layout { height: 100%; display: flex; flex-direction: column; }
+.tab-layout__content { flex: 1; min-height: 0; position: relative; }
+.tabbar {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 6px 8px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.tabbar__item {
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.tabbar__item[aria-current="page"] { color: var(--accent); }
+.tabbar__item:hover { background: var(--muted-fill); }
+
+/* Telas das abas: sem botão de voltar, título grande no topo, rolam por dentro */
+.tab-screen { padding: max(28px, env(safe-area-inset-top)) 24px 32px; overflow-y: auto; }
+.tab-screen .section-title:first-of-type { margin-top: 28px; }
+/* Na coluna com rolagem, nada encolhe (senão o subtítulo, que corta com …, some). */
+.tab-screen > * { flex-shrink: 0; }
+.section-title__count { font-weight: 500; color: var(--ink-3); }
+
+/* Perfil dentro de um cartão (Configurações) */
+.profile--compact { margin-top: 0; gap: 14px; }
+.profile--compact .profile__name { font-size: 17px; }
+.profile__actions--row { margin-top: 12px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
+.account { margin-top: 28px; }

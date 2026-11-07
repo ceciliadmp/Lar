@@ -97,6 +97,20 @@ const PATHS = {
       <circle cx="12" cy="19" r="2" fill="currentColor" stroke="none" />
     </>
   ),
+  tasks: (
+    <>
+      <path d="M10 6h11M10 12h11M10 18h11" />
+      <path d="m3 6 1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17" />
+    </>
+  ),
+  chart: <path d="M4 20h16M7 20v-7M12 20V5M17 20v-10" />,
+  sliders: (
+    <>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2.2" />
+      <circle cx="9" cy="17" r="2.2" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16" />
@@ -124,6 +138,9 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   repeat: [3, 2, 21, 22],
   users: [2.5, 4.5, 21.5, 20],
   more: [3, 3, 21, 21],
+  tasks: [3, 5, 21, 19.5],
+  chart: [4, 5, 20, 20],
+  sliders: [4, 4.8, 20, 19.2],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
 };
