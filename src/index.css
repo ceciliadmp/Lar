@@ -226,11 +226,12 @@ h1, h2, p { margin: 0; }
 .new-task-btn:hover { background: #1e44a8; }
 
 /* Título "Tarefas" com o nome da casa como subtítulo; o botão + fica centralizado com os dois */
-.tasks__heading { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tasks__heading { min-width: 0; display: flex; flex-direction: column; }
+/* 8px entre o título e o subtítulo (home e Placar) */
+.title-l + .tasks__subtitle { margin-top: 8px; }
 .tasks__subtitle {
   margin: 0;
-  /* 2px em cima e embaixo; nas laterais fica 0 para alinhar com o título */
-  padding: 2px 0;
+  padding: 0 0 0 2px;
   font-size: 15px;
   font-weight: 500;
   color: var(--ink-3);
