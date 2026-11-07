@@ -74,10 +74,14 @@ export function Tasks({
     <div className="tasks">
       <div className="tasks__head">
         <div className="tasks__top">
-          <button type="button" className="house-link" aria-label={`${s.house.name}: membros e convite`} onClick={goMembers}>
-            <span className="eyebrow">{s.house.name}</span>
-            <Icon name="users" size={16} />
-          </button>
+          <Button
+            variant="secondary"
+            className="square-btn"
+            aria-label={`Membros e convite de ${s.house.name}`}
+            onClick={goMembers}
+          >
+            <Icon name="users" size={18} />
+          </Button>
           {/* Pontos do mês de cada pessoa, à esquerda da foto; toque para ver o placar. */}
           <button type="button" className="score-mini" aria-label={scoreLabel} onClick={() => actions.go('score')}>
             {table.slice(0, STRIP_MAX).map((row) => (
@@ -94,12 +98,14 @@ export function Tasks({
           </button>
         </div>
         <div className="tasks__title">
-          <h1 className="title-l">Tarefas</h1>
-          <Button className="new-task-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
+          <div className="tasks__heading">
+            <h1 className="title-l">Tarefas</h1>
+            <p className="tasks__subtitle">{s.house.name}</p>
+          </div>
+          <Button className="new-task-btn square-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
             <Icon name="plus" size={16} strokeWidth={2.4} />
           </Button>
         </div>
-
 
         <div className="segmented segmented--3 tasks__tabs" role="group" aria-label="Período">
           {PERIODS.map((p) => (
