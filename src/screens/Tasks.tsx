@@ -161,7 +161,7 @@ export function Tasks({
       <div className="tasks__footer">
         <Button className="add-btn" onClick={() => actions.go('newTask')}>
           <Icon name="plus" size={16} strokeWidth={2.4} />
-          Adicionar atividade
+          Adicionar tarefa
         </Button>
       </div>
     </div>
