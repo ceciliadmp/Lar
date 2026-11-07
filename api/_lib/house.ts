@@ -126,8 +126,10 @@ interface StoredUser {
   /** A casa em que a pessoa está, e o lugar dela lá. */
   house: { houseId: string; memberId: string } | null;
   createdAt: string;
-  /** Logins feitos antes deste momento (ms) não valem mais: a senha foi trocada. */
+  /** Logins feitos antes deste momento (ms) não valem mais (regra antiga, ainda respeitada). */
   sessionsValidAfter?: number;
+  /** Sobe a cada troca de senha: logins de gerações anteriores deixam de valer. */
+  sessionGen?: number;
   /** Versão da foto de perfil; a imagem fica em `lar:photo:<id>`. */
   photo?: string;
 }
@@ -232,7 +234,12 @@ export interface Env {
   sendEmail: ((email: Email) => Promise<void>) | null;
 }
 
-const SESSION_DAYS = 90;
+/** O login vence depois de 24h sem usar o app; cada uso renova o prazo. */
+const SESSION_IDLE_S = 24 * 60 * 60;
+/** Renova no máximo a cada 15 min (evita uma gravação no banco a cada atualização automática). */
+const SESSION_REFRESH_MS = 15 * 60 * 1000;
+/** O prazo guardado inclui essa folga, para valer sempre pelo menos 24h desde o último uso. */
+const SESSION_TTL_S = SESSION_IDLE_S + SESSION_REFRESH_MS / 1000;
 const MAX_LOGIN_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_S = 15 * 60;
 
@@ -492,18 +499,29 @@ const account = (u: StoredUser): Account => ({ name: u.name, email: u.email, pho
 
 async function newSession(store: Store, u: StoredUser): Promise<string> {
   const token = randomId(32);
-  // Guarda quando o login foi feito, para poder invalidar logins antigos ao trocar a senha.
-  await store.set(sessionKey(token), `${u.id}|${Date.now()}`, SESSION_DAYS * 86_400);
+  // Guarda quando o login foi feito (para invalidar logins antigos ao trocar a senha)
+  // e quando foi renovado pela última vez.
+  const now = Date.now();
+  await store.set(sessionKey(token), `${u.id}|${now}|${now}|${u.sessionGen ?? 0}`, SESSION_TTL_S);
   return token;
 }
 
 async function userFromToken(store: Store, token: unknown): Promise<StoredUser> {
   if (typeof token !== 'string' || !token) throw new HttpError(401, 'Entre na sua conta.');
   const raw = await store.get(sessionKey(token));
-  const [userId, issued] = (raw ?? '').split('|');
+  const [userId, issued, refreshed, gen] = (raw ?? '').split('|');
   const u = userId ? await loadJson<StoredUser>(store, userKey(userId)) : null;
-  if (!u || (u.sessionsValidAfter && Number(issued ?? 0) < u.sessionsValidAfter)) {
-    throw new HttpError(401, 'Sua sessão expirou. Entre de novo.');
+  if (!u) throw new HttpError(401, 'Você ficou mais de 24 horas sem usar o app. Entre de novo.');
+  if (
+    Number(gen ?? 0) !== (u.sessionGen ?? 0) ||
+    (u.sessionsValidAfter && Number(issued ?? 0) < u.sessionsValidAfter)
+  ) {
+    throw new HttpError(401, 'A senha da sua conta foi trocada. Entre de novo.');
+  }
+  // Usou o app: mais 24h a partir de agora.
+  const now = Date.now();
+  if (now - Number(refreshed ?? issued ?? 0) > SESSION_REFRESH_MS) {
+    await store.set(sessionKey(token), `${userId}|${issued}|${now}|${gen ?? 0}`, SESSION_TTL_S);
   }
   return u;
 }
@@ -691,10 +709,9 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       await store.del(resetKey(resetToken)); // o link só vale uma vez
       u.salt = randomId(16);
       u.passwordHash = await hashPassword(password, u.salt);
-      u.sessionsValidAfter = Date.now(); // desconecta os outros aparelhos
+      u.sessionGen = (u.sessionGen ?? 0) + 1; // desconecta os outros aparelhos
       await saveUser(store, u);
       await store.del(attemptsKey(u.email));
-      await new Promise((r) => setTimeout(r, 2)); // o login novo fica depois do corte
       return reply(store, u, await newSession(store, u));
     }
 

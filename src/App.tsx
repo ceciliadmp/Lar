@@ -6,6 +6,7 @@ import {
   clearLegacy,
   loadLegacy,
   loadToken,
+  saveLastEmail,
   saveToken,
   type Account,
   type Period,
@@ -157,6 +158,7 @@ export default function App() {
   /** Entrou na conta: guarda o login e vai para a casa (ou para escolher uma). */
   const signedIn = (res: ApiResult) => {
     saveToken(res.token!);
+    if (res.account) saveLastEmail(res.account.email);
     clearLegacy();
     apply(res);
     setFresh(false);

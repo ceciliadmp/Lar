@@ -55,6 +55,25 @@ export function saveToken(t: string | null) {
   }
 }
 
+const EMAIL_KEY = 'lar:last-email';
+
+/** Último e-mail usado neste aparelho, para já vir preenchido no login. */
+export function loadLastEmail(): string {
+  try {
+    return localStorage.getItem(EMAIL_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+export function saveLastEmail(email: string) {
+  try {
+    localStorage.setItem(EMAIL_KEY, email);
+  } catch {
+    /* ignora */
+  }
+}
+
 export function loadLegacy(): LegacySession | undefined {
   try {
     const raw = localStorage.getItem(LEGACY_KEY);

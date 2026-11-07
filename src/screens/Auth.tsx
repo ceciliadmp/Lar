@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Actions } from '../App';
-import type { Account } from '../state';
+import { loadLastEmail, type Account } from '../state';
 import { BackButton, Button, TextField } from '../components/ui';
 import { useSubmit } from '../useSubmit';
 
@@ -75,7 +75,7 @@ export function Signup({ actions }: { actions: Actions }) {
 }
 
 export function Login({ actions }: { actions: Actions }) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(loadLastEmail);
   const [password, setPassword] = useState('');
   const { busy, error, onSubmit } = useSubmit(() => actions.login(email.trim(), password));
 
