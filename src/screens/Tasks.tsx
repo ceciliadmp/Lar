@@ -27,8 +27,8 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'all', label: 'Todas' },
 ];
 
-/** Quantas pessoas aparecem no placar do topo antes de "+N". */
-const STRIP_MAX = 4;
+/** Pessoas nos pontos ao lado do título: até 3; com mais, as 2 primeiras e "+N". */
+const STRIP_MAX = 3;
 
 export function Tasks({
   view: s,
@@ -61,6 +61,10 @@ export function Tasks({
   const goMembers = () => actions.go('settings');
 
   const table = s.game.standings;
+  // Com 3 pessoas e algum placar de dois dígitos não cabe ao lado do título: mostra 2 e "+1".
+  const roomy = table.length <= STRIP_MAX && table.every((r) => r.points < 10);
+  const shown = roomy || table.length < STRIP_MAX ? table : table.slice(0, STRIP_MAX - 1);
+  const hidden = table.length - shown.length;
   const scoreLabel =
     'Placar: ' +
     table
@@ -73,38 +77,30 @@ export function Tasks({
   return (
     <div className="tasks">
       <div className="tasks__head">
-        <div className="tasks__top">
-          <Button
-            variant="secondary"
-            className="square-btn"
-            aria-label={`Membros e convite de ${s.house.name} (Configurações)`}
-            onClick={goMembers}
-          >
-            <Icon name="users" size={18} />
-          </Button>
-          {/* Pontos de cada pessoa, à esquerda da foto (só para ver; o placar fica na aba Placar). */}
-          <div className="score-mini" role="img" aria-label={scoreLabel}>
-            {table.slice(0, STRIP_MAX).map((row) => (
-              <span key={row.memberId} className="score-mini__person" aria-hidden="true">
-                <strong>{row.points}</strong>
-                <Avatar info={avatarFor(s, row.memberId)} size="md" />
-              </span>
-            ))}
-            {table.length > STRIP_MAX && (
-              <span className="score-mini__more" aria-hidden="true">
-                +{table.length - STRIP_MAX}
-              </span>
-            )}
-          </div>
-        </div>
         <div className="tasks__title">
           <div className="tasks__heading">
             <h1 className="title-l">Tarefas</h1>
             <p className="tasks__subtitle">{s.house.name}</p>
           </div>
-          <Button className="new-task-btn square-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
-            <Icon name="plus" size={16} strokeWidth={2.4} />
-          </Button>
+          <div className="tasks__actions">
+            {/* Pontos de cada pessoa, à esquerda da foto (só para ver; o placar fica na aba Placar). */}
+            <div className="score-mini" role="img" aria-label={scoreLabel}>
+              {shown.map((row) => (
+                <span key={row.memberId} className="score-mini__person" aria-hidden="true">
+                  <strong>{row.points}</strong>
+                  <Avatar info={avatarFor(s, row.memberId)} />
+                </span>
+              ))}
+              {hidden > 0 && (
+                <span className="score-mini__more" aria-hidden="true">
+                  +{hidden}
+                </span>
+              )}
+            </div>
+            <Button className="new-task-btn square-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
+              <Icon name="plus" size={16} strokeWidth={2.4} />
+            </Button>
+          </div>
         </div>
 
         <div className="segmented segmented--3 tasks__tabs" role="group" aria-label="Período">
