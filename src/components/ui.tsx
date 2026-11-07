@@ -79,13 +79,7 @@ const PATHS = {
       <path d="M21 13v1a4 4 0 0 1-4 4H3" />
     </>
   ),
-  trophy: (
-    <>
-      <path d="M8 21h8M12 17v4" />
-      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" />
-      <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
-    </>
-  ),
+  star: <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" />,
   users: (
     <>
       <circle cx="9" cy="8" r="3.5" />
@@ -118,7 +112,7 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   plus: [5, 5, 19, 19],
   close: [6, 6, 18, 18],
   repeat: [3, 2, 21, 22],
-  trophy: [4, 4, 20, 21],
+  star: [3, 3, 21, 20.2],
   users: [2.5, 4.5, 21.5, 20],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
@@ -131,7 +125,18 @@ const MIN_ICON = 16;
  * `size` é o tamanho do desenho em si (lado maior), não da caixa em volta:
  * o ícone é recortado no próprio traço, então 16 quer dizer 16px de forma visível.
  */
-export function Icon({ name, size = 20, strokeWidth = 2 }: { name: keyof typeof PATHS; size?: number; strokeWidth?: number }) {
+export function Icon({
+  name,
+  size = 20,
+  strokeWidth = 2,
+  fill = 'none',
+}: {
+  name: keyof typeof PATHS;
+  size?: number;
+  strokeWidth?: number;
+  /** Cor de preenchimento (ícones são só contorno por padrão). */
+  fill?: string;
+}) {
   const [x0, y0, x1, y1] = BOUNDS[name];
   const w = x1 - x0;
   const h = y1 - y0;
@@ -143,7 +148,7 @@ export function Icon({ name, size = 20, strokeWidth = 2 }: { name: keyof typeof 
       width={(w + 2 * pad) * scale}
       height={(h + 2 * pad) * scale}
       viewBox={`${x0 - pad} ${y0 - pad} ${w + 2 * pad} ${h + 2 * pad}`}
-      fill="none"
+      fill={fill}
       stroke="currentColor"
       strokeWidth={strokeWidth}
       strokeLinecap="round"
@@ -153,5 +158,14 @@ export function Icon({ name, size = 20, strokeWidth = 2 }: { name: keyof typeof 
     >
       {PATHS[name]}
     </svg>
+  );
+}
+
+/** Estrela amarela dos pontos (contorno âmbar para aparecer bem em fundo claro). */
+export function Star({ size = 16 }: { size?: number }) {
+  return (
+    <span className="star" aria-hidden="true">
+      <Icon name="star" size={size} strokeWidth={1.5} fill="#F5B800" />
+    </span>
   );
 }

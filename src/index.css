@@ -205,15 +205,17 @@ h1, h2, p { margin: 0; }
 
 /* Título da home com o botão "Nova tarefa" à direita */
 .tasks__title { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* Botão primário compacto: 36px visíveis, mas a área de toque continua com 44px. */
 .new-task-btn {
+  position: relative;
   flex: none;
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border-radius: 12px;
-  color: var(--ink);
+  border-radius: 10px;
 }
-.new-task-btn:hover { background: var(--muted-fill); }
+.new-task-btn::before { content: ''; position: absolute; inset: -4px; }
+.new-task-btn:hover { background: #1e44a8; }
 
 /* Members */
 .members { overflow-y: auto; }
@@ -373,7 +375,7 @@ h1, h2, p { margin: 0; }
   gap: 10px;
 }
 .house-link:hover, .score-mini:hover { background: var(--muted-fill); }
-.score-mini__icon { color: var(--ink-2); display: flex; }
+.star { display: inline-flex; color: #b07800; }
 .score-mini__person { display: flex; align-items: center; gap: 4px; }
 .score-mini__person strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .score-mini__more { font-size: 13px; font-weight: 600; color: var(--ink-3); }

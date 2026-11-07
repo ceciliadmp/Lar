@@ -1,4 +1,4 @@
-import { Avatar, Button, Icon, IconButton } from '../components/ui';
+import { Avatar, Button, Icon, IconButton, Star } from '../components/ui';
 import type { Actions } from '../App';
 import {
   addDays,
@@ -74,9 +74,7 @@ export function Tasks({
           </button>
           {/* Pontos do mês de cada pessoa, à esquerda da foto; toque para ver o placar. */}
           <button type="button" className="score-mini" aria-label={scoreLabel} onClick={() => actions.go('score')}>
-            <span className="score-mini__icon" aria-hidden="true">
-              <Icon name="trophy" size={16} />
-            </span>
+            <Star size={18} />
             {table.slice(0, STRIP_MAX).map((row) => (
               <span key={row.memberId} className="score-mini__person" aria-hidden="true">
                 <strong>{row.points}</strong>
@@ -92,8 +90,8 @@ export function Tasks({
         </div>
         <div className="tasks__title">
           <h1 className="title-l">Tarefas</h1>
-          <Button variant="secondary" className="new-task-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
-            <Icon name="plus" size={18} strokeWidth={2.2} />
+          <Button className="new-task-btn" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
+            <Icon name="plus" size={16} strokeWidth={2.4} />
           </Button>
         </div>
 

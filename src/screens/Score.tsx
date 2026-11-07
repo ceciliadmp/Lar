@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Actions } from '../App';
-import { Avatar, BackButton, Button, Icon, TextField } from '../components/ui';
+import { Avatar, BackButton, Button, Star, TextField } from '../components/ui';
 import { useSubmit } from '../useSubmit';
 import { avatarFor, daysUntil, isAdmin, shortDateKey, type GameView, type HouseView, type RoundResult } from '../state';
 
@@ -51,7 +51,7 @@ export function Score({ view: s, actions }: { view: HouseView; actions: Actions 
                 {m.id === s.meId ? `${m.name} (você)` : m.name}
                 {leading && (
                   <span className="rank__badge">
-                    <Icon name="trophy" size={16} /> na frente
+                    <Star /> na frente
                   </span>
                 )}
               </span>
@@ -78,7 +78,7 @@ function RewardCard({ game: g }: { game: GameView }) {
   return (
     <div className="reward">
       <span className="reward__label">
-        <Icon name="trophy" size={16} /> Prêmio do mês
+        <Star /> Prêmio do mês
       </span>
       <span className="reward__text">{g.reward}</span>
       <span className="reward__when">
