@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { BackButton, Button, Chip, TextField } from '../components/ui';
 import type { Actions } from '../App';
 import { dayKey, WEEK_ORDER, weekdayShort, type HouseView } from '../state';
@@ -14,12 +14,7 @@ export function NewTask({ view: s, actions }: { view: HouseView; actions: Action
   // Mínimo obrigatório: 1 ponto, já marcado.
   const [points, setPoints] = useState(1);
   const [repeat, setRepeat] = useState<number[]>([today.getDay()]);
-  const inputRef = useRef<HTMLInputElement>(null);
   const disabled = !title.trim() || (mode === 'repeat' && repeat.length === 0);
-
-  useEffect(() => {
-    inputRef.current?.focus({ preventScroll: true });
-  }, []);
 
   const people = [
     { id: null as string | null, label: 'Qualquer um' },
@@ -50,7 +45,6 @@ export function NewTask({ view: s, actions }: { view: HouseView; actions: Action
 
       <div className="fields" style={{ marginTop: 24, gap: 24 }}>
         <TextField
-          ref={inputRef}
           id="f-task"
           label="O que precisa ser feito?"
           placeholder="Ex.: Lavar a louça"

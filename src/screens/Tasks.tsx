@@ -158,9 +158,12 @@ export function Tasks({
         )}
       </div>
 
-      <button type="button" className="fab" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
-        <Icon name="plus" size={22} strokeWidth={2.2} />
-      </button>
+      <div className="tasks__footer">
+        <Button className="add-btn" onClick={() => actions.go('newTask')}>
+          <Icon name="plus" size={16} strokeWidth={2.4} />
+          Adicionar atividade
+        </Button>
+      </div>
     </div>
   );
 }

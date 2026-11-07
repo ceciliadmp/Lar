@@ -147,7 +147,7 @@ h1, h2, p { margin: 0; }
 .progress { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; color: var(--ink-2); }
 .progress__track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .progress__bar { height: 6px; border-radius: 3px; background: var(--accent); transition: width 200ms ease; }
-.tasks__body { flex-grow: 1; overflow-y: auto; padding: 12px 24px 120px; }
+.tasks__body { flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 24px 24px; }
 .empty { padding: 64px 12px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
 .empty strong { font-size: 16px; font-weight: 600; }
 .empty span { font-size: 14px; color: var(--ink-3); }
@@ -208,21 +208,14 @@ h1, h2, p { margin: 0; }
 .task__title { font-size: 16px; line-height: 1.35; font-weight: 500; }
 .task--done .task__title { color: var(--ink-3); text-decoration: line-through; }
 
-.fab {
-  position: absolute;
-  right: 24px;
-  bottom: 40px;
-  width: 60px;
-  height: 60px;
-  border: 0;
-  border-radius: 20px;
-  background: var(--accent);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 24px rgba(28, 28, 26, 0.18);
+/* Botão fixo no pé da home: a lista rola por cima, o botão fica sempre à vista. */
+.tasks__footer {
+  flex: none;
+  padding: 12px 24px 32px;
+  border-top: 1px solid var(--line);
+  background: var(--ground);
 }
+.add-btn { width: 100%; }
 
 /* Members */
 .members { overflow-y: auto; }
@@ -367,7 +360,7 @@ h1, h2, p { margin: 0; }
   gap: 10px;
   text-align: left;
 }
-.score-strip__icon { flex: none; color: var(--accent); display: flex; }
+.score-strip__icon { flex: none; color: var(--ink-2); display: flex; }
 .score-strip__people { flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 14px; overflow: hidden; }
 .score-strip__person { display: flex; align-items: center; gap: 6px; flex: none; }
 .score-strip__person strong { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
