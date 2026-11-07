@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { Avatar, Button, Icon, IconButton } from '../components/ui';
+import { Avatar, Button, Icon } from '../components/ui';
+import { RowMenu } from '../components/Menu';
 import { ConfirmDialog } from '../components/Dialog';
 import type { Actions } from '../App';
 import {
@@ -190,21 +191,24 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
       >
         <span className="task__box">{done && <Icon name="check" size={16} strokeWidth={3} />}</span>
       </button>
-      <TaskText task={t} meta={meta} late={!!o.lateFrom} actions={actions} />
+      <TaskText task={t} meta={meta} late={!!o.lateFrom} />
       <Avatar info={avatarFor(s, done ? o.doneBy : t.assignee)} />
-      <IconButton label={`Excluir: ${t.title}`} className="task__delete" onClick={() => setConfirming(true)}>
-        <Icon name="trash" size={18} />
-      </IconButton>
+      <RowMenu
+        label={`Opções: ${t.title}`}
+        items={[
+          { label: 'Editar', onSelect: () => actions.openEdit(t.id) },
+          { label: 'Excluir', danger: true, onSelect: () => setConfirming(true) },
+        ]}
+      />
       {confirming && <DeleteDialog task={t} day={o.key} onClose={close} actions={actions} />}
     </li>
   );
 }
 
-/** Título e detalhes de uma tarefa; tocar abre a edição. */
-function TaskText({ task: t, meta, late, actions }: { task: Task; meta: string; late?: boolean; actions: Actions }) {
+/** Título e detalhes de uma tarefa. */
+function TaskText({ task: t, meta, late }: { task: Task; meta: string; late?: boolean }) {
   return (
-    <button type="button" className="task__text task__edit" onClick={() => actions.openEdit(t.id)}>
-      <span className="sr-only">Editar: </span>
+    <div className="task__text">
       <span className="task__title">
         {t.title}
         <span className="pts-tag" title={`Vale ${pts(t.points ?? 1)}`}>
@@ -213,7 +217,7 @@ function TaskText({ task: t, meta, late, actions }: { task: Task; meta: string; 
         </span>
       </span>
       <span className={late ? 'caption caption--late' : 'caption'}>{meta}</span>
-    </button>
+    </div>
   );
 }
 
@@ -340,11 +344,15 @@ function AllRow({
   ].join(' · ');
   return (
     <li className="task task--all">
-      <TaskText task={t} meta={meta} late={late} actions={actions} />
+      <TaskText task={t} meta={meta} late={late} />
       <Avatar info={avatarFor(s, t.assignee)} />
-      <IconButton label={`Excluir: ${t.title}`} className="task__delete" onClick={() => setConfirming(true)}>
-        <Icon name="trash" size={18} />
-      </IconButton>
+      <RowMenu
+        label={`Opções: ${t.title}`}
+        items={[
+          { label: 'Editar', onSelect: () => actions.openEdit(t.id) },
+          { label: 'Excluir', danger: true, onSelect: () => setConfirming(true) },
+        ]}
+      />
       {confirming && <DeleteDialog task={t} day={null} onClose={close} actions={actions} />}
     </li>
   );

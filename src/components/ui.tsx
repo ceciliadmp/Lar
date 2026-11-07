@@ -14,7 +14,11 @@ export function Button({
   return <button type="button" className={cls} {...rest} />;
 }
 
-export function IconButton({ label, className = '', ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+export function IconButton({
+  label,
+  className = '',
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { label: string; ref?: Ref<HTMLButtonElement> }) {
   return <button type="button" aria-label={label} className={`icon-btn ${className}`} {...rest} />;
 }
 
@@ -86,6 +90,13 @@ const PATHS = {
       <path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3a6.5 6.5 0 0 1 3.5 5.7" />
     </>
   ),
+  more: (
+    <>
+      <circle cx="12" cy="5" r="2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="19" r="2" fill="currentColor" stroke="none" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16" />
@@ -112,6 +123,7 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   close: [6, 6, 18, 18],
   repeat: [3, 2, 21, 22],
   users: [2.5, 4.5, 21.5, 20],
+  more: [3, 3, 21, 21],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
 };
