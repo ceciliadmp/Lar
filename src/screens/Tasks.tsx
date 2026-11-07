@@ -48,14 +48,11 @@ export function Tasks({
     return { key: dayKey(date), name, sub, items: occurrencesOn(s.tasks, date, todayKey) };
   });
 
-  const today = occurrencesOn(s.tasks, now, todayKey);
-  const doneToday = today.filter((o) => o.doneBy).length;
 
   // Pendentes primeiro; atrasadas no topo.
   const sorted = (items: Occurrence[]) =>
     [...items].sort((a, b) => Number(!!a.doneBy) - Number(!!b.doneBy) || Number(!a.lateFrom) - Number(!b.lateFrom));
 
-  const pct = today.length ? Math.round((doneToday / today.length) * 100) : 0;
   const showInvite = fresh && s.members.length === 1;
   const goMembers = () => actions.go('members');
 
@@ -80,7 +77,13 @@ export function Tasks({
             ))}
           </button>
         </div>
-        <h1 className="title-l" style={{ marginTop: 12 }}>Tarefas</h1>
+        <div className="tasks__title">
+          <h1 className="title-l">Tarefas</h1>
+          <Button variant="ghost" className="new-task-btn" onClick={() => actions.go('newTask')}>
+            <Icon name="plus" size={16} strokeWidth={2.4} />
+            Nova tarefa
+          </Button>
+        </div>
 
         {/* Pontos de todo mundo, sempre à vista; toque para ver o placar completo. */}
         <button type="button" className="score-strip" aria-label={scoreLabel} onClick={() => actions.go('score')}>
@@ -101,12 +104,6 @@ export function Tasks({
           </span>
         </button>
 
-        <div className="progress">
-          <span>{today.length ? `${doneToday} de ${today.length} feitas hoje` : 'Nada para hoje'}</span>
-          <div className="progress__track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso de hoje">
-            <div className="progress__bar" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
         <div className="segmented segmented--3" role="group" aria-label="Período" style={{ marginTop: 18 }}>
           {PERIODS.map((p) => (
             <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
@@ -156,13 +153,6 @@ export function Tasks({
             );
           })
         )}
-      </div>
-
-      <div className="tasks__footer">
-        <Button className="add-btn" onClick={() => actions.go('newTask')}>
-          <Icon name="plus" size={16} strokeWidth={2.4} />
-          Adicionar tarefa
-        </Button>
       </div>
     </div>
   );
