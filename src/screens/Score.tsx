@@ -74,6 +74,11 @@ export function Score({ view: s, actions }: { view: HouseView; actions: Actions 
         })}
       </ol>
 
+      {g.history.length > 0 && <History rounds={g.history} />}
+
+      {admin && <GameSettings game={g.enabled ? g : null} actions={actions} />}
+
+      {/* Tirar pontos fica abaixo do cartão do prêmio, com o histórico logo depois. */}
       {others.length > 0 && <TakePoint view={s} actions={actions} />}
 
       {taken.length > 0 && (
@@ -92,10 +97,6 @@ export function Score({ view: s, actions }: { view: HouseView; actions: Actions 
           </ul>
         </>
       )}
-
-      {g.history.length > 0 && <History rounds={g.history} />}
-
-      {admin && <GameSettings game={g.enabled ? g : null} actions={actions} />}
     </div>
   );
 }
