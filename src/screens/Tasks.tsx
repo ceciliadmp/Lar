@@ -88,7 +88,7 @@ export function Tasks({
               {shown.map((row) => (
                 <span key={row.memberId} className="score-mini__person" aria-hidden="true">
                   <strong>{row.points}</strong>
-                  <Avatar info={avatarFor(s, row.memberId)} />
+                  <Avatar info={avatarFor(s, row.memberId)} size="xs" />
                 </span>
               ))}
               {hidden > 0 && (

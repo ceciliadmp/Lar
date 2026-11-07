@@ -53,7 +53,7 @@ export function Chip({
   );
 }
 
-export function Avatar({ info, size = 'sm' }: { info: AvatarInfo; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+export function Avatar({ info, size = 'sm' }: { info: AvatarInfo; size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' }) {
   const photo = usePhoto(info.photo);
   return (
     <span aria-hidden="true" className={`avatar avatar--${size}`} style={{ background: info.bg, color: info.fg }}>

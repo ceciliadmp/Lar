@@ -127,6 +127,7 @@ h1, h2, p { margin: 0; }
   align-items: center;
   justify-content: center;
 }
+.avatar--xs { width: 24px; height: 24px; font-size: 11px; }
 .avatar--sm { width: 28px; height: 28px; font-size: 12px; }
 .avatar--md { width: 32px; height: 32px; font-size: 13px; }
 .avatar--lg { width: 40px; height: 40px; font-size: 15px; }
@@ -143,7 +144,7 @@ h1, h2, p { margin: 0; }
 .tasks { height: 100%; display: flex; flex-direction: column; }
 /* Topo da home mais próximo da borda; respeita o entalhe do celular quando houver. */
 .tasks__head { padding: max(28px, env(safe-area-inset-top)) 24px 0; display: flex; flex-direction: column; }
-/* Espaçamentos do topo da home: título → abas 12px, abas → conteúdo 16px. */
+/* Espaçamentos do topo da home: título → abas 24px, abas → conteúdo 16px. */
 .tasks__body { flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 24px; }
 .empty { padding: 64px 12px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
 .empty strong { font-size: 16px; font-weight: 600; }
@@ -205,7 +206,7 @@ h1, h2, p { margin: 0; }
 .task--done .task__title { color: var(--ink-3); text-decoration: line-through; }
 
 /* Título da home com o botão "Nova tarefa" à direita */
-.tasks__tabs { margin-top: 12px; }
+.tasks__tabs { margin-top: 24px; }
 .tasks__title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 /* Pontos e botão + lado a lado, 16px de distância */
 .tasks__actions { flex: none; display: flex; align-items: center; gap: 16px; }
@@ -228,6 +229,8 @@ h1, h2, p { margin: 0; }
 .tasks__heading { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .tasks__subtitle {
   margin: 0;
+  /* 2px em cima e embaixo; nas laterais fica 0 para alinhar com o título */
+  padding: 2px 0;
   font-size: 15px;
   font-weight: 500;
   color: var(--ink-3);
