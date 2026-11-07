@@ -86,6 +86,13 @@ const PATHS = {
       <path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" />
     </>
   ),
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3a6.5 6.5 0 0 1 3.5 5.7" />
+    </>
+  ),
   trash: (
     <>
       <path d="M4 7h16" />
@@ -112,6 +119,7 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   close: [6, 6, 18, 18],
   repeat: [3, 2, 21, 22],
   trophy: [4, 4, 20, 21],
+  users: [2.5, 4.5, 21.5, 20],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
 };

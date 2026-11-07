@@ -67,7 +67,7 @@ export default function App() {
   const [period, setPeriodState] = useState<Period>(() => {
     try {
       const p = localStorage.getItem('lar:period');
-      return p === 'tomorrow' || p === 'week' ? p : 'today';
+      return p === 'week' ? 'week' : 'today'; // "amanhã" (aba antiga) vira hoje
     } catch {
       return 'today';
     }

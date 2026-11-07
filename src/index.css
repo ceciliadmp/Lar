@@ -1,16 +1,16 @@
 :root {
+  /* Neutros frios (cinza levemente azulado), para combinar com o azul do app. */
   --accent: #2b5bd7;
-  --ink: #1c1c1a;
-  --ink-2: #57564f;
-  --ink-3: #6b6a64;
-  --ground: #f6f5f1;
+  --ink: #161a23;
+  --ink-2: #485063;
+  --ink-3: #5b6375;
+  --ground: #f7f8fa;
   --surface: #ffffff;
-  --line: #e4e2da;
-  --line-strong: #d6d4cb;
-  --muted-fill: #edebe4;
-  --check-idle: #b9b7ae;
+  --line: #e4e7ec;
+  --line-strong: #d0d5dd;
+  --muted-fill: #eef0f4;
+  --check-idle: #8a93a3;
   --danger: #9a3b2e;
-  --scrim: rgba(28, 28, 26, 0.32);
 
   font-family: Inter, system-ui, sans-serif;
   color: var(--ink);
@@ -129,8 +129,6 @@ h1, h2, p { margin: 0; }
 .avatar--sm { width: 28px; height: 28px; font-size: 12px; }
 .avatar--md { width: 32px; height: 32px; font-size: 13px; }
 .avatar--lg { width: 40px; height: 40px; font-size: 15px; }
-.avatar-stack { height: 44px; padding: 0 4px 0 10px; border: 0; background: transparent; display: flex; align-items: center; }
-.avatar-stack .avatar { margin-left: -8px; border: 2px solid var(--ground); }
 
 /* Cards */
 .card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -198,7 +196,7 @@ h1, h2, p { margin: 0; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; gap: 4px; border-radius: 14px; background: var(--muted-fill); }
 .segmented button { height: 40px; border: 0; border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .segmented button[aria-pressed="true"],
-.segmented button[aria-checked="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(28, 28, 26, 0.12); }
+.segmented button[aria-checked="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(22, 26, 35, 0.12); }
 .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
 .weekdays .chip { padding: 0; min-width: 0; height: 44px; border-radius: 12px; }
 .task__text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -347,25 +345,38 @@ h1, h2, p { margin: 0; }
 .select:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
 .form-ok { font-size: 14px; color: #24513C; font-weight: 600; }
 
-/* Faixa de pontos na home */
-.score-strip {
-  margin-top: 14px;
-  min-height: 52px;
-  padding: 6px 4px 6px 12px;
-  border: 1.5px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
+/* Topo da home: casa (abre Membros) e pontos do mês (abre o Placar) */
+.house-link {
+  min-width: 0;
+  height: 44px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.house-link .eyebrow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-mini {
+  flex: none;
+  height: 44px;
+  margin-right: -8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 22px;
+  background: transparent;
   display: flex;
   align-items: center;
   gap: 10px;
-  text-align: left;
 }
-.score-strip__icon { flex: none; color: var(--ink-2); display: flex; }
-.score-strip__people { flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 14px; overflow: hidden; }
-.score-strip__person { display: flex; align-items: center; gap: 6px; flex: none; }
-.score-strip__person strong { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.score-strip__more { font-size: 14px; font-weight: 600; color: var(--ink-3); flex: none; }
-.score-strip__chevron { flex: none; color: var(--ink-3); display: flex; width: 32px; justify-content: center; }
+.house-link:hover, .score-mini:hover { background: var(--muted-fill); }
+.score-mini__icon { color: var(--ink-2); display: flex; }
+.score-mini__person { display: flex; align-items: center; gap: 4px; }
+.score-mini__person strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.score-mini__more { font-size: 13px; font-weight: 600; color: var(--ink-3); }
 
 /* Valor da tarefa */
 .pts-tag {

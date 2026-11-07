@@ -18,11 +18,10 @@ import {
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'today', label: 'Hoje' },
-  { id: 'tomorrow', label: 'Amanhã' },
   { id: 'week', label: 'Semana' },
 ];
 
-/** Quantos aparecem na faixa de pontos antes de "+N". */
+/** Quantas pessoas aparecem no placar do topo antes de "+N". */
 const STRIP_MAX = 4;
 
 export function Tasks({
@@ -39,15 +38,14 @@ export function Tasks({
   const now = new Date();
   const todayKey = dayKey(now);
 
-  // Hoje, amanhã, ou os próximos 7 dias a partir de hoje.
-  const offsets = period === 'today' ? [0] : period === 'tomorrow' ? [1] : [0, 1, 2, 3, 4, 5, 6];
+  // Hoje, ou os próximos 7 dias a partir de hoje (amanhã aparece na semana).
+  const offsets = period === 'today' ? [0] : [0, 1, 2, 3, 4, 5, 6];
   const days = offsets.map((i) => {
     const date = addDays(now, i);
     const name = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : weekdayLong(date.getDay());
     const sub = i <= 1 ? longDate(date) : shortDate(date);
     return { key: dayKey(date), name, sub, items: occurrencesOn(s.tasks, date, todayKey) };
   });
-
 
   // Pendentes primeiro; atrasadas no topo.
   const sorted = (items: Occurrence[]) =>
@@ -70,11 +68,26 @@ export function Tasks({
     <div className="tasks">
       <div className="tasks__head">
         <div className="tasks__top">
-          <span className="eyebrow">{s.house.name}</span>
-          <button type="button" className="avatar-stack" aria-label="Membros da casa" onClick={goMembers}>
-            {s.members.slice(0, 3).map((m) => (
-              <Avatar key={m.id} info={avatarFor(s, m.id)} size="md" />
+          <button type="button" className="house-link" aria-label={`${s.house.name}: membros e convite`} onClick={goMembers}>
+            <span className="eyebrow">{s.house.name}</span>
+            <Icon name="users" size={16} />
+          </button>
+          {/* Pontos do mês de cada pessoa, à esquerda da foto; toque para ver o placar. */}
+          <button type="button" className="score-mini" aria-label={scoreLabel} onClick={() => actions.go('score')}>
+            <span className="score-mini__icon" aria-hidden="true">
+              <Icon name="trophy" size={16} />
+            </span>
+            {table.slice(0, STRIP_MAX).map((row) => (
+              <span key={row.memberId} className="score-mini__person" aria-hidden="true">
+                <strong>{row.points}</strong>
+                <Avatar info={avatarFor(s, row.memberId)} size="md" />
+              </span>
             ))}
+            {table.length > STRIP_MAX && (
+              <span className="score-mini__more" aria-hidden="true">
+                +{table.length - STRIP_MAX}
+              </span>
+            )}
           </button>
         </div>
         <div className="tasks__title">
@@ -85,26 +98,8 @@ export function Tasks({
           </Button>
         </div>
 
-        {/* Pontos de todo mundo, sempre à vista; toque para ver o placar completo. */}
-        <button type="button" className="score-strip" aria-label={scoreLabel} onClick={() => actions.go('score')}>
-          <span className="score-strip__icon" aria-hidden="true">
-            <Icon name="trophy" size={18} />
-          </span>
-          <span className="score-strip__people" aria-hidden="true">
-            {table.slice(0, STRIP_MAX).map((row) => (
-              <span key={row.memberId} className="score-strip__person">
-                <Avatar info={avatarFor(s, row.memberId)} />
-                <strong>{row.points}</strong>
-              </span>
-            ))}
-            {table.length > STRIP_MAX && <span className="score-strip__more">+{table.length - STRIP_MAX}</span>}
-          </span>
-          <span className="score-strip__chevron" aria-hidden="true">
-            <Icon name="chevron" size={16} />
-          </span>
-        </button>
 
-        <div className="segmented segmented--3" role="group" aria-label="Período" style={{ marginTop: 18 }}>
+        <div className="segmented" role="group" aria-label="Período" style={{ marginTop: 18 }}>
           {PERIODS.map((p) => (
             <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
               {p.label}

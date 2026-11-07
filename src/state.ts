@@ -3,7 +3,7 @@ import type { Account, GameView, HouseView, LegacySession, Request, Response, Ro
 export type { Account, GameView, HouseView, RoundResult, Task };
 export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'members' | 'score' | 'profile';
 /** O que a tela de tarefas mostra. */
-export type Period = 'today' | 'tomorrow' | 'week';
+export type Period = 'today' | 'week';
 
 /* ---------- API ---------- */
 
@@ -79,14 +79,14 @@ const PALETTE = [
   { bg: '#F3E3CF', fg: '#7A4A12' },
   { bg: '#DDE3F0', fg: '#2C3F6B' },
   { bg: '#EEDDE6', fg: '#6B2C4C' },
-  { bg: '#E6E4DC', fg: '#4A4943' },
+  { bg: '#E8EBF0', fg: '#465062' },
 ];
 
 export interface AvatarInfo { bg: string; fg: string; initial: string; photo?: string | null }
 
 export function avatarFor(v: HouseView, id: string | null): AvatarInfo {
   const i = id ? v.members.findIndex((m) => m.id === id) : -1;
-  if (i < 0) return { bg: '#E6E4DC', fg: '#4A4943', initial: '·' };
+  if (i < 0) return { bg: '#E8EBF0', fg: '#465062', initial: '·' };
   const m = v.members[i];
   return { ...PALETTE[i % PALETTE.length], initial: m.name.charAt(0).toUpperCase(), photo: m.photo };
 }
