@@ -37,6 +37,8 @@ export interface Task {
   repeat: number[] | null;
   /** Dia → quem fez. Avulsa usa a chave `date`; recorrente, uma chave por dia. */
   completions: Record<string, string>;
+  /** Quanto vale cada conclusão no placar: 1, 2 ou 3 (tarefas antigas: 1). */
+  points?: number;
 }
 
 /** Formato antigo (antes da agenda semanal), convertido ao carregar. */
@@ -72,6 +74,8 @@ interface ScoreEntry {
   /** Tarefa e dia da tarefa que foi marcada (para desfazer). */
   t: number;
   k: string;
+  /** Pontos ganhos (registros antigos: 1). */
+  p?: number;
 }
 
 interface StoredGame {
@@ -91,7 +95,12 @@ export interface RoundResult {
   winners: { name: string; points: number }[];
 }
 
+/**
+ * Pontos do mês, sempre visíveis para todos. `enabled` diz se há prêmio configurado pelo admin;
+ * sem prêmio, o mês vai do dia 1 ao último dia.
+ */
 export interface GameView {
+  enabled: boolean;
   closingDay: number;
   reward: string;
   /** Rodada atual. */
@@ -128,7 +137,7 @@ export interface HouseView {
   meId: string;
   members: { id: string; name: string; role: Role }[];
   tasks: Task[];
-  game: GameView | null;
+  game: GameView;
 }
 
 type Authed<T> = T & { token: string };
@@ -142,7 +151,14 @@ export type Request =
   | Authed<{ action: 'logout' }>
   | Authed<{ action: 'createHouse'; houseName: string; timezone?: string }>
   | Authed<{ action: 'joinHouse'; code: string }>
-  | Authed<{ action: 'addTask'; title: string; assignee: string | null; date: string | null; repeat: number[] | null }>
+  | Authed<{
+      action: 'addTask';
+      title: string;
+      assignee: string | null;
+      date: string | null;
+      repeat: number[] | null;
+      points: number;
+    }>
   | Authed<{ action: 'toggleTask'; taskId: number; date: string }>
   | Authed<{ action: 'deleteTask'; taskId: number }>
   | Authed<{ action: 'removeMember'; memberId: string }>
@@ -354,7 +370,7 @@ function roundOf(day: string, closingDay: number): { start: string; end: string 
 
 function standings(h: StoredHouse, start: string, end: string) {
   const pts = new Map<string, number>();
-  for (const e of h.score ?? []) if (e.d >= start && e.d <= end) pts.set(e.m, (pts.get(e.m) ?? 0) + 1);
+  for (const e of h.score ?? []) if (e.d >= start && e.d <= end) pts.set(e.m, (pts.get(e.m) ?? 0) + (e.p ?? 1));
   return h.members
     .map((m) => ({ memberId: m.id, points: pts.get(m.id) ?? 0 }))
     .sort((a, b) => b.points - a.points);
@@ -384,19 +400,20 @@ function settleRound(h: StoredHouse): boolean {
   return changed;
 }
 
-function gameView(h: StoredHouse): GameView | null {
+function gameView(h: StoredHouse): GameView {
   const g = h.game;
-  if (!g) return null;
   const today = todayIn(h);
-  const r = roundOf(today, g.closingDay);
+  const closingDay = g?.closingDay ?? 0;
+  const r = roundOf(today, closingDay);
   return {
-    closingDay: g.closingDay,
-    reward: g.reward,
+    enabled: !!g,
+    closingDay,
+    reward: g?.reward ?? '',
     start: r.start,
     end: r.end,
     today,
     standings: standings(h, r.start, r.end),
-    history: g.history,
+    history: g?.history ?? [],
   };
 }
 
@@ -685,7 +702,9 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       const repeat = req.repeat != null ? cleanRepeat(req.repeat) : null;
       const date = repeat ? null : cleanDate(req.date);
       if (h.tasks.length >= 500) throw new HttpError(409, 'A casa já tem tarefas demais. Apague algumas.');
-      h.tasks.unshift({ id: h.nextTaskId++, title, assignee, createdBy: me.id, date, repeat, completions: {} });
+      const points = Number(req.points ?? 1);
+      if (![1, 2, 3].includes(points)) throw new HttpError(400, 'A tarefa vale 1, 2 ou 3 pontos.');
+      h.tasks.unshift({ id: h.nextTaskId++, title, assignee, createdBy: me.id, date, repeat, completions: {}, points });
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
@@ -703,8 +722,8 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         h.score = h.score.filter((e) => !(e.t === t.id && e.k === day));
       } else {
         t.completions[day] = me.id;
-        // 1 ponto para quem fez, no dia em que fez.
-        h.score.push({ m: me.id, d: todayIn(h), t: t.id, k: day });
+        // Os pontos da tarefa vão para quem fez, no dia em que fez.
+        h.score.push({ m: me.id, d: todayIn(h), t: t.id, k: day, p: t.points ?? 1 });
       }
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };

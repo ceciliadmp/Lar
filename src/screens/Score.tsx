@@ -22,46 +22,47 @@ export function Score({ view: s, actions }: { view: HouseView; actions: Actions 
       <span className="eyebrow" style={{ marginTop: 16 }}>{s.house.name}</span>
       <h1 className="title-m" style={{ marginTop: 4 }}>Placar</h1>
 
-      {g ? (
-        <>
-          <RewardCard game={g} />
-          <h2 className="section-title">Ranking do mês</h2>
-          <p className="caption">Cada tarefa concluída vale 1 ponto.</p>
-          <ol className="list ranking">
-            {g.standings.map((row, i) => {
-              const m = s.members.find((x) => x.id === row.memberId)!;
-              const leading = row.points > 0 && row.points === g.standings[0].points;
-              return (
-                <li key={row.memberId} className={leading ? 'rank rank--lead' : 'rank'}>
-                  <span className="rank__pos">{i + 1}º</span>
-                  <Avatar info={avatarFor(s, m.id)} size="lg" />
-                  <span className="rank__name">
-                    {m.id === s.meId ? `${m.name} (você)` : m.name}
-                    {leading && (
-                      <span className="rank__badge">
-                        <Icon name="trophy" size={14} /> na frente
-                      </span>
-                    )}
-                  </span>
-                  <span className="rank__pts">{row.points}</span>
-                </li>
-              );
-            })}
-          </ol>
-          {g.history.length > 0 && <History rounds={g.history} />}
-        </>
+      {g.enabled ? (
+        <RewardCard game={g} />
       ) : (
         <div className="card" style={{ marginTop: 24 }}>
-          <span style={{ fontSize: 15, fontWeight: 600 }}>O placar está desligado</span>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Ainda sem prêmio</span>
           <span className="lead" style={{ fontSize: 14 }}>
             {admin
-              ? 'Ligue o placar para que cada tarefa concluída valha 1 ponto. No dia que você escolher, quem tiver mais pontos no mês ganha a recompensa.'
-              : 'Quem administra a casa pode ligar o placar e escolher uma recompensa para quem fizer mais tarefas no mês.'}
+              ? 'Os pontos já estão valendo. Escolha abaixo um dia do mês e uma recompensa para quem fizer mais pontos.'
+              : 'Os pontos já estão valendo. Quem administra a casa pode escolher uma recompensa para quem fizer mais pontos no mês.'}
           </span>
         </div>
       )}
 
-      {admin && <GameSettings game={g} actions={actions} />}
+      <h2 className="section-title">Ranking do mês</h2>
+      <p className="caption">
+        Cada tarefa vale de 1 a 3 pontos para quem a concluir. Mês de {shortDateKey(g.start)} a {shortDateKey(g.end)}.
+      </p>
+      <ol className="list ranking">
+        {g.standings.map((row, i) => {
+          const m = s.members.find((x) => x.id === row.memberId)!;
+          const leading = row.points > 0 && row.points === g.standings[0].points;
+          return (
+            <li key={row.memberId} className={leading ? 'rank rank--lead' : 'rank'}>
+              <span className="rank__pos">{i + 1}º</span>
+              <Avatar info={avatarFor(s, m.id)} size="lg" />
+              <span className="rank__name">
+                {m.id === s.meId ? `${m.name} (você)` : m.name}
+                {leading && (
+                  <span className="rank__badge">
+                    <Icon name="trophy" size={16} /> na frente
+                  </span>
+                )}
+              </span>
+              <span className="rank__pts">{row.points}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {g.history.length > 0 && <History rounds={g.history} />}
+
+      {admin && <GameSettings game={g.enabled ? g : null} actions={actions} />}
     </div>
   );
 }
@@ -127,7 +128,7 @@ function GameSettings({ game: g, actions }: { game: GameView | null; actions: Ac
 
   return (
     <form className="card settings" onSubmit={onSubmit}>
-      <span style={{ fontSize: 15, fontWeight: 600 }}>{g ? 'Configurar o placar' : 'Ligar o placar'}</span>
+      <span style={{ fontSize: 15, fontWeight: 600 }}>{g ? 'Prêmio do mês' : 'Criar um prêmio'}</span>
       <div className="field">
         <label htmlFor="f-closing">Dia da premiação</label>
         <select
@@ -167,11 +168,11 @@ function GameSettings({ game: g, actions }: { game: GameView | null; actions: Ac
         </p>
       )}
       <Button type="submit" disabled={!reward.trim() || busy || unchanged}>
-        {busy ? 'Salvando…' : g ? 'Salvar' : 'Ligar placar'}
+        {busy ? 'Salvando…' : g ? 'Salvar' : 'Criar prêmio'}
       </Button>
       {g && (
         <Button variant="danger-text" style={{ height: 44, fontSize: 14 }} onClick={() => actions.stopGame()}>
-          Desligar placar
+          Tirar o prêmio
         </Button>
       )}
     </form>

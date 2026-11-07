@@ -7,7 +7,6 @@ import {
   loadToken,
   saveToken,
   type Account,
-  type Filter,
   type Period,
   type HouseView,
   type Screen,
@@ -16,6 +15,7 @@ import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
+import { Icon } from './components/ui';
 import { Members } from './screens/Members';
 import { NewTaskSheet } from './screens/NewTaskSheet';
 
@@ -25,7 +25,6 @@ type ApiResult = Awaited<ReturnType<typeof api>>;
 
 export interface Actions {
   go(screen: Screen): void;
-  setFilter(f: Filter): void;
   setPeriod(p: Period): void;
   openSheet(): void;
   closeSheet(): void;
@@ -39,7 +38,7 @@ export interface Actions {
   join(code: string): Promise<string | null>;
   /** `day` é a chave do dia marcado (para recorrentes, cada dia conta separado). */
   toggleTask(id: number, day: string): void;
-  addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null): void;
+  addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null, points: number): void;
   deleteTask(id: number): void;
   removeMember(id: string): void;
   newCode(): void;
@@ -62,7 +61,6 @@ export default function App() {
   const [view, setView] = useState<HouseView | null>(null);
   const [booting, setBooting] = useState(!!token && !resetToken);
   const [screen, setScreen] = useState<Screen>(resetToken ? 'reset' : 'welcome');
-  const [filter, setFilter] = useState<Filter>('all');
   const [period, setPeriodState] = useState<Period>(() => {
     try {
       const p = localStorage.getItem('lar:period');
@@ -146,7 +144,6 @@ export default function App() {
     saveToken(res.token!);
     clearLegacy();
     apply(res);
-    setFilter('all');
     setFresh(false);
     setNotice(null);
     setScreen(res.view ? 'tasks' : 'home');
@@ -167,7 +164,6 @@ export default function App() {
 
   const enterHouse = (res: ApiResult, isNew: boolean) => {
     apply(res);
-    setFilter('all');
     setFresh(isNew);
     setScreen('tasks');
   };
@@ -177,7 +173,6 @@ export default function App() {
       setSheetOpen(false);
       setScreen(s);
     },
-    setFilter,
     setPeriod: (p) => {
       setPeriodState(p);
       try {
@@ -222,10 +217,10 @@ export default function App() {
       });
       void send({ action: 'toggleTask', token, taskId: id, date: day });
     },
-    addTask: (title, assignee, date, repeat) => {
+    addTask: (title, assignee, date, repeat, points) => {
       if (!token) return;
       setSheetOpen(false);
-      void send({ action: 'addTask', token, title, assignee, date, repeat });
+      void send({ action: 'addTask', token, title, assignee, date, repeat, points });
     },
     deleteTask: (id) => {
       if (!token || !view) return;
@@ -241,7 +236,7 @@ export default function App() {
       }),
     stopGame: () => {
       if (!token) return;
-      if (!window.confirm('Desligar o placar? Os pontos continuam guardados, mas não há prêmio até ligar de novo.')) return;
+      if (!window.confirm('Tirar o prêmio do mês? Os pontos continuam valendo e aparecendo para todos.')) return;
       void send({ action: 'stopGame', token });
     },
     leave: () => {
@@ -270,7 +265,7 @@ export default function App() {
           {screen === 'create' && <CreateHouse actions={actions} />}
           {screen === 'join' && <JoinHouse actions={actions} />}
           {inHouse && !view && <div className="screen loading" aria-live="polite">Carregando a casa…</div>}
-          {screen === 'tasks' && view && <Tasks view={view} filter={filter} period={period} fresh={fresh} actions={actions} />}
+          {screen === 'tasks' && view && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
           {screen === 'score' && view && <Score view={view} actions={actions} />}
           {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
           {screen === 'tasks' && view && sheetOpen && <NewTaskSheet view={view} actions={actions} />}
@@ -280,7 +275,7 @@ export default function App() {
         <div className="notice" role="status">
           <span>{notice}</span>
           <button type="button" className="notice__close" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
-            ×
+            <Icon name="close" size={18} />
           </button>
         </div>
       )}

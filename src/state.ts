@@ -4,7 +4,6 @@ export type { Account, GameView, HouseView, RoundResult, Task };
 export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'members' | 'score';
 /** O que a tela de tarefas mostra. */
 export type Period = 'today' | 'tomorrow' | 'week';
-export type Filter = 'all' | 'mine' | 'done';
 
 /* ---------- API ---------- */
 

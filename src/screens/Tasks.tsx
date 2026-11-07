@@ -1,4 +1,4 @@
-import { Avatar, Button, Chip, Icon, IconButton } from '../components/ui';
+import { Avatar, Button, Icon, IconButton } from '../components/ui';
 import type { Actions } from '../App';
 import {
   addDays,
@@ -11,7 +11,6 @@ import {
   occurrencesOn,
   shortDate,
   weekdayLong,
-  type Filter,
   type HouseView,
   type Occurrence,
   type Period,
@@ -23,20 +22,20 @@ const PERIODS: { id: Period; label: string }[] = [
   { id: 'week', label: 'Semana' },
 ];
 
+/** Quantos aparecem na faixa de pontos antes de "+N". */
+const STRIP_MAX = 4;
+
 export function Tasks({
   view: s,
-  filter,
   period,
   fresh,
   actions,
 }: {
   view: HouseView;
-  filter: Filter;
   period: Period;
   fresh: boolean;
   actions: Actions;
 }) {
-  const me = s.meId;
   const now = new Date();
   const todayKey = dayKey(now);
 
@@ -51,55 +50,57 @@ export function Tasks({
 
   const today = occurrencesOn(s.tasks, now, todayKey);
   const doneToday = today.filter((o) => o.doneBy).length;
-  const mineCount = days.reduce((n, d) => n + d.items.filter((o) => o.task.assignee === me && !o.doneBy).length, 0);
 
-  const applyFilter = (items: Occurrence[]) => {
-    let list = items;
-    if (filter === 'mine') list = list.filter((o) => o.task.assignee === me && !o.doneBy);
-    if (filter === 'done') list = list.filter((o) => o.doneBy);
-    // Pendentes primeiro; atrasadas no topo.
-    return [...list].sort(
-      (a, b) => Number(!!a.doneBy) - Number(!!b.doneBy) || Number(!a.lateFrom) - Number(!b.lateFrom),
-    );
-  };
-
-  const filters: { id: Filter; label: string }[] = [
-    { id: 'all', label: 'Todas' },
-    { id: 'mine', label: mineCount ? `Minhas · ${mineCount}` : 'Minhas' },
-    { id: 'done', label: 'Feitas' },
-  ];
-
-  const emptyText =
-    filter === 'mine' ? 'Nada com você.' : filter === 'done' ? 'Nada feito ainda.' : 'Nada marcado para este dia.';
+  // Pendentes primeiro; atrasadas no topo.
+  const sorted = (items: Occurrence[]) =>
+    [...items].sort((a, b) => Number(!!a.doneBy) - Number(!!b.doneBy) || Number(!a.lateFrom) - Number(!b.lateFrom));
 
   const pct = today.length ? Math.round((doneToday / today.length) * 100) : 0;
   const showInvite = fresh && s.members.length === 1;
   const goMembers = () => actions.go('members');
-  const myPoints = s.game?.standings.find((x) => x.memberId === me)?.points ?? 0;
+
+  const table = s.game.standings;
+  const scoreLabel =
+    'Placar do mês: ' +
+    table
+      .map((row) => {
+        const name = row.memberId === s.meId ? 'você' : (s.members.find((m) => m.id === row.memberId)?.name ?? '');
+        return `${name} ${row.points}`;
+      })
+      .join(', ');
 
   return (
     <div className="tasks">
       <div className="tasks__head">
         <div className="tasks__top">
           <span className="eyebrow">{s.house.name}</span>
-          <div className="tasks__top-actions">
-            <button
-              type="button"
-              className="score-pill"
-              aria-label={s.game ? `Placar: você tem ${myPoints} ${myPoints === 1 ? 'ponto' : 'pontos'} este mês` : 'Placar'}
-              onClick={() => actions.go('score')}
-            >
-              <Icon name="trophy" size={18} />
-              {s.game && <span>{myPoints} pts</span>}
-            </button>
-            <button type="button" className="avatar-stack" aria-label="Membros da casa" onClick={goMembers}>
-              {s.members.slice(0, 3).map((m) => (
-                <Avatar key={m.id} info={avatarFor(s, m.id)} size="md" />
-              ))}
-            </button>
-          </div>
+          <button type="button" className="avatar-stack" aria-label="Membros da casa" onClick={goMembers}>
+            {s.members.slice(0, 3).map((m) => (
+              <Avatar key={m.id} info={avatarFor(s, m.id)} size="md" />
+            ))}
+          </button>
         </div>
         <h1 className="title-l" style={{ marginTop: 12 }}>Tarefas</h1>
+
+        {/* Pontos de todo mundo, sempre à vista; toque para ver o placar completo. */}
+        <button type="button" className="score-strip" aria-label={scoreLabel} onClick={() => actions.go('score')}>
+          <span className="score-strip__icon" aria-hidden="true">
+            <Icon name="trophy" size={20} />
+          </span>
+          <span className="score-strip__people" aria-hidden="true">
+            {table.slice(0, STRIP_MAX).map((row) => (
+              <span key={row.memberId} className="score-strip__person">
+                <Avatar info={avatarFor(s, row.memberId)} />
+                <strong>{row.points}</strong>
+              </span>
+            ))}
+            {table.length > STRIP_MAX && <span className="score-strip__more">+{table.length - STRIP_MAX}</span>}
+          </span>
+          <span className="score-strip__chevron" aria-hidden="true">
+            <Icon name="chevron" size={20} />
+          </span>
+        </button>
+
         <div className="progress">
           <span>{today.length ? `${doneToday} de ${today.length} feitas hoje` : 'Nada para hoje'}</span>
           <div className="progress__track" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso de hoje">
@@ -111,13 +112,6 @@ export function Tasks({
             <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
               {p.label}
             </button>
-          ))}
-        </div>
-        <div className="chips" style={{ marginTop: 12, flexWrap: 'nowrap' }}>
-          {filters.map((f) => (
-            <Chip key={f.id} filter pressed={filter === f.id} onClick={() => actions.setFilter(f.id)}>
-              {f.label}
-            </Chip>
           ))}
         </div>
       </div>
@@ -143,14 +137,14 @@ export function Tasks({
           </div>
         ) : (
           days.map((d) => {
-            const list = applyFilter(d.items);
+            const list = sorted(d.items);
             return (
               <section key={d.key} className="day" aria-labelledby={`day-${d.key}`}>
                 <h2 id={`day-${d.key}`} className="day__title">
                   {d.name} <span>· {d.sub}</span>
                 </h2>
                 {list.length === 0 ? (
-                  <p className="day__empty">{emptyText}</p>
+                  <p className="day__empty">Nada marcado para este dia.</p>
                 ) : (
                   <ul className="list">
                     {list.map((o) => (
@@ -170,6 +164,8 @@ export function Tasks({
     </div>
   );
 }
+
+const pts = (n: number) => (n === 1 ? '1 ponto' : `${n} pontos`);
 
 function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; actions: Actions }) {
   const t = o.task;
@@ -197,16 +193,20 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
         aria-pressed={done}
         onClick={() => actions.toggleTask(t.id, o.key)}
       >
-        <span className="task__box">{done && <Icon name="check" size={14} strokeWidth={3} />}</span>
+        <span className="task__box">{done && <Icon name="check" size={16} strokeWidth={3} />}</span>
       </button>
       <div className="task__text">
         <span className="task__title">
           {t.repeat && (
             <span className="task__repeat" title={describeRepeat(t.repeat)}>
-              <Icon name="repeat" size={14} />
+              <Icon name="repeat" size={16} />
             </span>
           )}
           {t.title}
+          <span className="pts-tag" title={`Vale ${pts(t.points ?? 1)}`}>
+            <span aria-hidden="true">+{t.points ?? 1}</span>
+            <span className="sr-only">, vale {pts(t.points ?? 1)}</span>
+          </span>
         </span>
         <span className={o.lateFrom ? 'caption caption--late' : 'caption'}>{meta}</span>
       </div>

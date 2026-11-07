@@ -41,11 +41,10 @@ export function TextField({
 
 export function Chip({
   pressed,
-  filter,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { pressed: boolean; filter?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & { pressed: boolean }) {
   return (
-    <button type="button" aria-pressed={pressed} className={filter ? 'chip chip--filter' : 'chip'} {...rest} />
+    <button type="button" aria-pressed={pressed} className="chip" {...rest} />
   );
 }
 
@@ -66,6 +65,7 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   back: <path d="m15 18-6-6 6-6" />,
+  chevron: <path d="m9 18 6-6-6-6" />,
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
   plus: <path d="M12 5v14M5 12h14" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
@@ -100,7 +100,11 @@ const PATHS: Record<string, ReactNode> = {
   ),
 };
 
+/** Ícones nunca ficam menores que 16×16. */
+const MIN_ICON = 16;
+
 export function Icon({ name, size = 24, strokeWidth = 2 }: { name: keyof typeof PATHS; size?: number; strokeWidth?: number }) {
+  size = Math.max(size, MIN_ICON);
   return (
     <svg
       width={size}

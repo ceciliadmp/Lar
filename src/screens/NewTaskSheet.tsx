@@ -10,6 +10,8 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('once');
+  // Mínimo obrigatório: 1 ponto, já marcado.
+  const [points, setPoints] = useState(1);
   const [repeat, setRepeat] = useState<number[]>([today.getDay()]);
   const inputRef = useRef<HTMLInputElement>(null);
   const close = () => actions.closeSheet();
@@ -43,7 +45,7 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
           e.preventDefault();
           if (disabled) return;
           // Avulsa é sempre para hoje.
-          actions.addTask(title.trim(), assignee, mode === 'once' ? dayKey(today) : null, mode === 'repeat' ? repeat : null);
+          actions.addTask(title.trim(), assignee, mode === 'once' ? dayKey(today) : null, mode === 'repeat' ? repeat : null, points);
         }}
       >
         <div className="sheet__grabber" aria-hidden="true" />
@@ -77,6 +79,24 @@ export function NewTaskSheet({ view: s, actions }: { view: HouseView; actions: A
               ))}
             </div>
           )}
+        </div>
+
+        <div className="field" style={{ gap: 10 }}>
+          <span className="field-label" id="points-label">Quantos pontos vale?</span>
+          <div className="segmented segmented--3" role="radiogroup" aria-labelledby="points-label">
+            {[1, 2, 3].map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={points === n}
+                aria-pressed={points === n}
+                onClick={() => setPoints(n)}
+              >
+                {n} {n === 1 ? 'ponto' : 'pontos'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="field" style={{ gap: 10 }}>

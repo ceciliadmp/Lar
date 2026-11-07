@@ -116,8 +116,6 @@ h1, h2, p { margin: 0; }
   font-weight: 600;
 }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.chip--filter { height: 38px; padding: 0 16px; border-radius: 19px; background: transparent; }
-.chip--filter[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
 
 /* Avatars */
 .avatar {
@@ -276,7 +274,7 @@ h1, h2, p { margin: 0; }
   gap: 8px;
 }
 .notice span { flex-grow: 1; padding: 12px 0; }
-.notice__close { width: 44px; height: 44px; border: 0; background: transparent; color: #fff; font-size: 22px; }
+.notice__close { width: 44px; height: 44px; border: 0; background: transparent; color: #fff; display: flex; align-items: center; justify-content: center; }
 
 /* Senha com mostrar/ocultar */
 .password { position: relative; }
@@ -371,3 +369,39 @@ h1, h2, p { margin: 0; }
 }
 .select:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
 .form-ok { font-size: 14px; color: #24513C; font-weight: 600; }
+
+/* Faixa de pontos na home */
+.score-strip {
+  margin-top: 14px;
+  min-height: 52px;
+  padding: 6px 4px 6px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+.score-strip__icon { flex: none; color: var(--accent); display: flex; }
+.score-strip__people { flex-grow: 1; min-width: 0; display: flex; align-items: center; gap: 14px; overflow: hidden; }
+.score-strip__person { display: flex; align-items: center; gap: 6px; flex: none; }
+.score-strip__person strong { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-strip__more { font-size: 14px; font-weight: 600; color: var(--ink-3); flex: none; }
+.score-strip__chevron { flex: none; color: var(--ink-3); display: flex; width: 32px; justify-content: center; }
+
+/* Valor da tarefa */
+.pts-tag {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 8px;
+  background: #E3EAFB;
+  color: #1E44A8;
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: 1px;
+  text-decoration: none;
+}
+.task--done .pts-tag { background: var(--muted-fill); color: var(--ink-3); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
