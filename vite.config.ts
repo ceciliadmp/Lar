@@ -1,13 +1,24 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { handle, memoryStore } from './api/_lib/house.js';
+import { handle, memoryStore, photoKey } from './api/_lib/house.js';
 
-/** Em `npm run dev`, responde /api/lar com dados em memória (somem ao reiniciar). */
+/** Em `npm run dev`, responde /api/lar e /api/photo com dados em memória (somem ao reiniciar). */
 function localApi(): Plugin {
   const store = memoryStore();
   return {
     name: 'lar-local-api',
     configureServer(server) {
+      server.middlewares.use('/api/photo', async (req, res) => {
+        const u = new URL(req.url ?? '', 'http://x').searchParams.get('u') ?? '';
+        const data = await store.get(photoKey(u));
+        if (!data) {
+          res.statusCode = 404;
+          res.end();
+          return;
+        }
+        res.setHeader('content-type', 'image/jpeg');
+        res.end(Buffer.from(data, 'base64'));
+      });
       server.middlewares.use('/api/lar', (req, res) => {
         let body = '';
         req.on('data', (c) => (body += c));

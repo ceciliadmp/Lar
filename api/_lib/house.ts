@@ -20,6 +20,8 @@ interface StoredMember {
   userId?: string;
   /** Só membros de antes das contas: o código secreto guardado no aparelho. */
   token?: string;
+  /** Versão da foto de perfil da conta (muda a cada troca). */
+  photo?: string;
 }
 
 /**
@@ -124,18 +126,20 @@ interface StoredUser {
   createdAt: string;
   /** Logins feitos antes deste momento (ms) não valem mais: a senha foi trocada. */
   sessionsValidAfter?: number;
+  /** Versão da foto de perfil; a imagem fica em `lar:photo:<id>`. */
+  photo?: string;
 }
 
 /** Sessão do formato antigo (antes das contas), guardada no aparelho. */
 export interface LegacySession { houseId: string; memberId: string; token: string }
 
-export interface Account { name: string; email: string }
+export interface Account { name: string; email: string; photo: string | null }
 
 /** O que o app recebe da casa: nunca inclui dados de login de ninguém. */
 export interface HouseView {
   house: { name: string; code: string };
   meId: string;
-  members: { id: string; name: string; role: Role }[];
+  members: { id: string; name: string; role: Role; photo: string | null }[];
   tasks: Task[];
   game: GameView;
 }
@@ -165,6 +169,8 @@ export type Request =
   | Authed<{ action: 'newCode' }>
   | Authed<{ action: 'setGame'; closingDay: number; reward: string }>
   | Authed<{ action: 'stopGame' }>
+  /** `photo`: data URL JPEG, ou null para remover. */
+  | Authed<{ action: 'setPhoto'; photo: string | null }>
   | Authed<{ action: 'leave' }>;
 
 export type Response =
@@ -187,6 +193,15 @@ const userKey = (id: string) => `lar:user:${id}`;
 const emailKey = (email: string) => `lar:email:${email}`;
 const sessionKey = (token: string) => `lar:session:${token}`;
 const attemptsKey = (email: string) => `lar:login-attempts:${email}`;
+export const photoKey = (userId: string) => `lar:photo:${userId}`;
+/** Fotos de perfil: JPEG quadrado, já reduzido no aparelho. */
+const MAX_PHOTO_CHARS = 400_000;
+
+/** Endereço da foto; a versão no endereço deixa o navegador guardar a imagem em cache para sempre. */
+function photoUrl(userId: string | undefined, version: string | undefined): string | null {
+  return userId && version ? `/api/photo?u=${userId}&v=${version}` : null;
+}
+
 const resetKey = (token: string) => `lar:reset:${token}`;
 const resetCountKey = (email: string) => `lar:reset-count:${email}`;
 
@@ -450,13 +465,13 @@ function view(h: StoredHouse, meId: string): HouseView {
   return {
     house: { name: h.name, code: h.code },
     meId,
-    members: h.members.map(({ id, name, role }) => ({ id, name, role })),
+    members: h.members.map(({ id, name, role, userId, photo }) => ({ id, name, role, photo: photoUrl(userId, photo) })),
     tasks: h.tasks,
     game: gameView(h),
   };
 }
 
-const account = (u: StoredUser): Account => ({ name: u.name, email: u.email });
+const account = (u: StoredUser): Account => ({ name: u.name, email: u.email, photo: photoUrl(u.id, u.photo) });
 
 /* ---------- contas ---------- */
 
@@ -658,7 +673,7 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       const u = await userFromToken(store, req.token);
       if (await houseOf(store, u)) throw new HttpError(409, 'Você já está numa casa. Saia dela antes.');
       const houseName = cleanText(req.houseName, 'o nome da casa', 60);
-      const me: StoredMember = { id: randomId(8), name: u.name, role: 'admin', userId: u.id };
+      const me: StoredMember = { id: randomId(8), name: u.name, role: 'admin', userId: u.id, photo: u.photo };
       const id = randomId();
       const code = await claimCode(store, id);
       const h: StoredHouse = {
@@ -686,7 +701,7 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         throw new HttpError(404, 'Código não encontrado. Confira com quem administra a casa.');
       }
       if (h.members.length >= 30) throw new HttpError(409, 'Esta casa já está cheia.');
-      const me: StoredMember = { id: randomId(8), name: u.name, role: 'membro', userId: u.id };
+      const me: StoredMember = { id: randomId(8), name: u.name, role: 'membro', userId: u.id, photo: u.photo };
       h.members.push(me);
       await saveHouse(store, h);
       u.house = { houseId: h.id, memberId: me.id };
@@ -787,6 +802,30 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       delete h.game;
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'setPhoto': {
+      const u = await userFromToken(store, req.token);
+      if (req.photo === null) {
+        await store.del(photoKey(u.id));
+        delete u.photo;
+      } else {
+        const prefix = 'data:image/jpeg;base64,';
+        const data = typeof req.photo === 'string' && req.photo.startsWith(prefix) ? req.photo.slice(prefix.length) : '';
+        if (!data || !/^[A-Za-z0-9+/=]+$/.test(data)) throw new HttpError(400, 'Imagem inválida. Tente outra foto.');
+        if (data.length > MAX_PHOTO_CHARS) throw new HttpError(413, 'Foto grande demais.');
+        await store.set(photoKey(u.id), data);
+        u.photo = randomId(4);
+      }
+      await saveUser(store, u);
+      // A casa guarda a versão da foto de cada membro, para todo mundo ver.
+      const r = await houseOf(store, u);
+      if (r) {
+        r.me.photo = u.photo;
+        if (!u.photo) delete r.me.photo;
+        await saveHouse(store, r.h);
+      }
+      return reply(store, u);
     }
 
     case 'leave': {

@@ -61,6 +61,17 @@ export function Members({ view: s, account, actions }: { view: HouseView; accoun
                   {role} · {pending === 0 ? 'nada para hoje' : pending === 1 ? '1 tarefa hoje' : `${pending} tarefas hoje`}
                 </span>
               </div>
+              {m.id === s.meId && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  style={{ padding: '0 12px', borderRadius: 10 }}
+                  aria-label="Editar seu perfil e foto"
+                  onClick={() => actions.go('profile')}
+                >
+                  Editar
+                </Button>
+              )}
               {admin && m.id !== s.meId && (
                 <Button
                   variant="danger-text"

@@ -85,7 +85,7 @@ export function Tasks({
         {/* Pontos de todo mundo, sempre à vista; toque para ver o placar completo. */}
         <button type="button" className="score-strip" aria-label={scoreLabel} onClick={() => actions.go('score')}>
           <span className="score-strip__icon" aria-hidden="true">
-            <Icon name="trophy" size={20} />
+            <Icon name="trophy" size={18} />
           </span>
           <span className="score-strip__people" aria-hidden="true">
             {table.slice(0, STRIP_MAX).map((row) => (
@@ -97,7 +97,7 @@ export function Tasks({
             {table.length > STRIP_MAX && <span className="score-strip__more">+{table.length - STRIP_MAX}</span>}
           </span>
           <span className="score-strip__chevron" aria-hidden="true">
-            <Icon name="chevron" size={20} />
+            <Icon name="chevron" size={16} />
           </span>
         </button>
 
@@ -158,8 +158,8 @@ export function Tasks({
         )}
       </div>
 
-      <button type="button" className="fab" aria-label="Nova tarefa" onClick={() => actions.openSheet()}>
-        <Icon name="plus" size={26} strokeWidth={2.2} />
+      <button type="button" className="fab" aria-label="Nova tarefa" onClick={() => actions.go('newTask')}>
+        <Icon name="plus" size={22} strokeWidth={2.2} />
       </button>
     </div>
   );

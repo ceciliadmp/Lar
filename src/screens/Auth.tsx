@@ -187,6 +187,9 @@ export function Home({ account, actions }: { account: Account; actions: Actions 
         <Button variant="secondary" onClick={() => actions.go('join')}>
           Entrar com um código
         </Button>
+        <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.go('profile')}>
+          Seu perfil e foto
+        </Button>
         <Button variant="ghost" style={{ height: 48, fontSize: 14 }} onClick={() => actions.logout()}>
           Sair da conta
         </Button>

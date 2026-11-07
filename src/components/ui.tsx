@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, Ref } from 'react';
+import type { ButtonHTMLAttributes, InputHTMLAttributes, Ref } from 'react';
 import type { AvatarInfo } from '../state';
 
 type Variant = 'primary' | 'secondary' | 'soft' | 'ghost' | 'danger-text';
@@ -20,7 +20,7 @@ export function IconButton({ label, className = '', ...rest }: ButtonHTMLAttribu
 export function BackButton({ onClick, label = 'Voltar' }: { onClick: () => void; label?: string }) {
   return (
     <IconButton label={label} className="back-btn" onClick={onClick}>
-      <Icon name="back" size={24} />
+      <Icon name="back" size={18} />
     </IconButton>
   );
 }
@@ -48,15 +48,15 @@ export function Chip({
   );
 }
 
-export function Avatar({ info, size = 'sm' }: { info: AvatarInfo; size?: 'sm' | 'md' | 'lg' }) {
+export function Avatar({ info, size = 'sm' }: { info: AvatarInfo; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
   return (
     <span aria-hidden="true" className={`avatar avatar--${size}`} style={{ background: info.bg, color: info.fg }}>
-      {info.initial}
+      {info.photo ? <img className="avatar__img" src={info.photo} alt="" /> : info.initial}
     </span>
   );
 }
 
-const PATHS: Record<string, ReactNode> = {
+const PATHS = {
   home: (
     <>
       <path d="M3 10.5 12 3l9 7.5" />
@@ -64,9 +64,9 @@ const PATHS: Record<string, ReactNode> = {
       <path d="m9.5 14.5 2 2 3.5-4" />
     </>
   ),
-  back: <path d="m15 18-6-6 6-6" />,
-  chevron: <path d="m9 18 6-6-6-6" />,
-  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  back: <path d="M19 12H5M12 19l-7-7 7-7" />,
+  chevron: <path d="M5 12h14M12 5l7 7-7 7" />,
+  check: <path d="m4 13 5 5L20 6" />,
   plus: <path d="M12 5v14M5 12h14" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   repeat: (
@@ -100,22 +100,46 @@ const PATHS: Record<string, ReactNode> = {
   ),
 };
 
-/** Ícones nunca ficam menores que 16×16. */
+/** Onde fica o desenho de cada ícone dentro da grade 24×24: [x0, y0, x1, y1]. */
+const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
+  home: [3, 3, 21, 20],
+  back: [5, 5, 19, 19],
+  chevron: [5, 5, 19, 19],
+  check: [4, 6, 20, 18],
+  plus: [5, 5, 19, 19],
+  close: [6, 6, 18, 18],
+  repeat: [3, 2, 21, 22],
+  trophy: [4, 4, 20, 21],
+  trash: [4, 4, 20, 21],
+  copy: [5, 3, 20, 20],
+};
+
+/** O desenho de um ícone nunca fica menor que 16×16px. */
 const MIN_ICON = 16;
 
-export function Icon({ name, size = 24, strokeWidth = 2 }: { name: keyof typeof PATHS; size?: number; strokeWidth?: number }) {
-  size = Math.max(size, MIN_ICON);
+/**
+ * `size` é o tamanho do desenho em si (lado maior), não da caixa em volta:
+ * o ícone é recortado no próprio traço, então 16 quer dizer 16px de forma visível.
+ */
+export function Icon({ name, size = 20, strokeWidth = 2 }: { name: keyof typeof PATHS; size?: number; strokeWidth?: number }) {
+  const [x0, y0, x1, y1] = BOUNDS[name];
+  const w = x1 - x0;
+  const h = y1 - y0;
+  // `size` vale para o lado maior; e nenhum dos dois lados fica abaixo de 16px.
+  const scale = Math.max(size / Math.max(w, h), MIN_ICON / Math.min(w, h));
+  const pad = strokeWidth / 2;
   return (
     <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
+      width={(w + 2 * pad) * scale}
+      height={(h + 2 * pad) * scale}
+      viewBox={`${x0 - pad} ${y0 - pad} ${w + 2 * pad} ${h + 2 * pad}`}
       fill="none"
       stroke="currentColor"
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      style={{ flex: 'none', display: 'block' }}
     >
       {PATHS[name]}
     </svg>

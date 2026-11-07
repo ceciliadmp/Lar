@@ -1,7 +1,7 @@
 import type { Account, GameView, HouseView, LegacySession, Request, Response, RoundResult, Task } from '../api/_lib/house';
 
 export type { Account, GameView, HouseView, RoundResult, Task };
-export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'members' | 'score';
+export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'members' | 'score' | 'profile';
 /** O que a tela de tarefas mostra. */
 export type Period = 'today' | 'tomorrow' | 'week';
 
@@ -82,12 +82,13 @@ const PALETTE = [
   { bg: '#E6E4DC', fg: '#4A4943' },
 ];
 
-export interface AvatarInfo { bg: string; fg: string; initial: string }
+export interface AvatarInfo { bg: string; fg: string; initial: string; photo?: string | null }
 
 export function avatarFor(v: HouseView, id: string | null): AvatarInfo {
   const i = id ? v.members.findIndex((m) => m.id === id) : -1;
   if (i < 0) return { bg: '#E6E4DC', fg: '#4A4943', initial: '·' };
-  return { ...PALETTE[i % PALETTE.length], initial: v.members[i].name.charAt(0).toUpperCase() };
+  const m = v.members[i];
+  return { ...PALETTE[i % PALETTE.length], initial: m.name.charAt(0).toUpperCase(), photo: m.photo };
 }
 
 export function nameOf(v: HouseView, id: string | null): string {
@@ -199,4 +200,40 @@ export function occurrencesOn(tasks: Task[], day: Date, today: string): Occurren
 /** "atrasada desde seg 9" */
 export function lateLabel(from: string): string {
   return `atrasada desde ${chipDate(parseDay(from))}`;
+}
+
+/* ---------- foto de perfil ---------- */
+
+const PHOTO_PX = 256;
+
+/** Lê a imagem escolhida, recorta no centro e reduz para 256×256 em JPEG (fica com uns 20 KB). */
+export async function photoFromFile(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode().catch(() => {
+      throw new Error('Não deu para abrir essa imagem. Tente uma foto em JPG ou PNG.');
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = PHOTO_PX;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#FFFFFF'; // PNG transparente vira fundo branco
+    ctx.fillRect(0, 0, PHOTO_PX, PHOTO_PX);
+    ctx.drawImage(
+      img,
+      (img.naturalWidth - side) / 2,
+      (img.naturalHeight - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      PHOTO_PX,
+      PHOTO_PX,
+    );
+    return canvas.toDataURL('image/jpeg', 0.85);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }

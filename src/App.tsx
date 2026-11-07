@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ApiError,
   api,
+  avatarFor,
   clearLegacy,
   loadLegacy,
   loadToken,
@@ -17,7 +18,8 @@ import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
 import { Icon } from './components/ui';
 import { Members } from './screens/Members';
-import { NewTaskSheet } from './screens/NewTaskSheet';
+import { NewTask } from './screens/NewTask';
+import { Profile } from './screens/Profile';
 
 const POLL_MS = 4000;
 
@@ -26,8 +28,6 @@ type ApiResult = Awaited<ReturnType<typeof api>>;
 export interface Actions {
   go(screen: Screen): void;
   setPeriod(p: Period): void;
-  openSheet(): void;
-  closeSheet(): void;
   /** Os formulários recebem uma mensagem de erro, ou null se deu certo. */
   signup(name: string, email: string, password: string): Promise<string | null>;
   login(email: string, password: string): Promise<string | null>;
@@ -42,6 +42,8 @@ export interface Actions {
   deleteTask(id: number): void;
   removeMember(id: string): void;
   newCode(): void;
+  /** Foto como data URL JPEG, ou null para remover. */
+  setPhoto(photo: string | null): Promise<string | null>;
   setGame(closingDay: number, reward: string): Promise<string | null>;
   stopGame(): void;
   leave(): void;
@@ -69,7 +71,6 @@ export default function App() {
       return 'today';
     }
   });
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [fresh, setFresh] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const tokenRef = useRef(token);
@@ -81,8 +82,7 @@ export default function App() {
     setAccount(res.account);
     setView(res.view);
     if (!res.view) {
-      setSheetOpen(false);
-      setScreen((s) => (s === 'tasks' || s === 'members' || s === 'score' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'members' || s === 'score' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -94,7 +94,6 @@ export default function App() {
     setAccount(null);
     setView(null);
     hadHouse.current = false;
-    setSheetOpen(false);
     setBooting(false);
     setScreen('welcome');
     setNotice(message ?? null);
@@ -169,10 +168,7 @@ export default function App() {
   };
 
   const actions: Actions = {
-    go: (s) => {
-      setSheetOpen(false);
-      setScreen(s);
-    },
+    go: (s) => setScreen(s),
     setPeriod: (p) => {
       setPeriodState(p);
       try {
@@ -181,8 +177,6 @@ export default function App() {
         /* ignora */
       }
     },
-    openSheet: () => setSheetOpen(true),
-    closeSheet: () => setSheetOpen(false),
     signup: (name, email, password) =>
       attempt(async () => signedIn(await api({ action: 'signup', name, email, password, legacy: loadLegacy() }))),
     login: (email, password) =>
@@ -218,8 +212,16 @@ export default function App() {
       void send({ action: 'toggleTask', token, taskId: id, date: day });
     },
     addTask: (title, assignee, date, repeat, points) => {
-      if (!token) return;
-      setSheetOpen(false);
+      if (!token || !view) return;
+      // Volta para a home na hora, já mostrando a tarefa; a resposta do servidor confirma.
+      setView({
+        ...view,
+        tasks: [
+          { id: -Date.now(), title, assignee, createdBy: view.meId, date, repeat, completions: {}, points },
+          ...view.tasks,
+        ],
+      });
+      setScreen('tasks');
       void send({ action: 'addTask', token, title, assignee, date, repeat, points });
     },
     deleteTask: (id) => {
@@ -229,6 +231,11 @@ export default function App() {
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),
+    setPhoto: (photo) =>
+      attempt(async () => {
+        const res = await api({ action: 'setPhoto', token: token!, photo });
+        apply(res);
+      }),
     setGame: (closingDay, reward) =>
       attempt(async () => {
         const res = await api({ action: 'setGame', token: token!, closingDay, reward });
@@ -248,7 +255,7 @@ export default function App() {
     },
   };
 
-  const inHouse = screen === 'tasks' || screen === 'members' || screen === 'score';
+  const inHouse = screen === 'tasks' || screen === 'newTask' || screen === 'members' || screen === 'score';
 
   return (
     <main className="app">
@@ -268,14 +275,22 @@ export default function App() {
           {screen === 'tasks' && view && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
           {screen === 'score' && view && <Score view={view} actions={actions} />}
           {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
-          {screen === 'tasks' && view && sheetOpen && <NewTaskSheet view={view} actions={actions} />}
+          {screen === 'newTask' && view && <NewTask view={view} actions={actions} />}
+          {screen === 'profile' && account && (
+            <Profile
+              account={account}
+              avatar={view ? avatarFor(view, view.meId) : { bg: '#DDE3F0', fg: '#2C3F6B', initial: account.name.charAt(0).toUpperCase() }}
+              inHouse={!!view}
+              actions={actions}
+            />
+          )}
         </>
       )}
       {notice && (
         <div className="notice" role="status">
           <span>{notice}</span>
           <button type="button" className="notice__close" aria-label="Fechar aviso" onClick={() => setNotice(null)}>
-            <Icon name="close" size={18} />
+            <Icon name="close" size={16} />
           </button>
         </div>
       )}
