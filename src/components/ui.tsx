@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, Ref } from 'react';
 import type { AvatarInfo } from '../state';
+import { usePhoto } from '../photos';
 
 type Variant = 'primary' | 'secondary' | 'soft' | 'ghost' | 'danger-text';
 
@@ -49,9 +50,10 @@ export function Chip({
 }
 
 export function Avatar({ info, size = 'sm' }: { info: AvatarInfo; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+  const photo = usePhoto(info.photo);
   return (
     <span aria-hidden="true" className={`avatar avatar--${size}`} style={{ background: info.bg, color: info.fg }}>
-      {info.photo ? <img className="avatar__img" src={info.photo} alt="" /> : info.initial}
+      {photo ? <img className="avatar__img" src={photo} alt="" /> : info.initial}
     </span>
   );
 }

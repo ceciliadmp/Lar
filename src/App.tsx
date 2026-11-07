@@ -17,6 +17,7 @@ import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
 import { Icon } from './components/ui';
+import { clearPhotos } from './photos';
 import { Members } from './screens/Members';
 import { NewTask } from './screens/NewTask';
 import { Profile } from './screens/Profile';
@@ -90,6 +91,7 @@ export default function App() {
 
   const signOut = useCallback((message?: string) => {
     saveToken(null);
+    clearPhotos();
     setToken(null);
     setAccount(null);
     setView(null);

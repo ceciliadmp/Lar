@@ -1,17 +1,21 @@
 // Função da Vercel: GET /api/photo?u=<conta>&v=<versão> devolve a foto de perfil (JPEG).
-import { photoKey } from './_lib/house.js';
+// Exige o login (Authorization: Bearer <token>) de alguém da mesma casa, ou da própria pessoa.
+import { readPhoto } from './_lib/house.js';
 import { redisStore } from './_lib/redis.js';
 
 export async function GET(request: Request): Promise<Response> {
-  const u = new URL(request.url).searchParams.get('u') ?? '';
   const store = redisStore();
-  const data = store && /^[0-9a-f]{32}$/.test(u) ? await store.get(photoKey(u)) : null;
-  if (!data) return new Response('Foto não encontrada.', { status: 404 });
-  return new Response(Buffer.from(data, 'base64'), {
+  if (!store) return new Response('Banco de dados não configurado.', { status: 500 });
+  const u = new URL(request.url).searchParams.get('u') ?? '';
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null;
+  const res = await readPhoto(store, token, u);
+  if (!res.ok) return new Response(null, { status: res.status, headers: { 'cache-control': 'no-store' } });
+  return new Response(Buffer.from(res.data, 'base64'), {
     headers: {
       'content-type': 'image/jpeg',
-      // O endereço muda quando a foto muda (?v=…), então pode ficar em cache por muito tempo.
-      'cache-control': 'public, max-age=31536000, immutable',
+      // Nada de cache: cada pedido confere de novo se a pessoa ainda é da casa.
+      // (O app guarda as fotos na memória enquanto está aberto.)
+      'cache-control': 'no-store',
     },
   });
 }

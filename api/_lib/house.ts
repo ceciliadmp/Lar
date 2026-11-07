@@ -533,6 +533,30 @@ async function houseOf(store: Store, u: StoredUser) {
   return { h, me };
 }
 
+/**
+ * Foto de perfil, só para quem pode ver: a própria pessoa ou alguém logado na mesma casa.
+ * Retorna o JPEG em base64, ou o status de erro.
+ */
+export async function readPhoto(
+  store: Store,
+  token: string | null,
+  userId: string,
+): Promise<{ ok: true; data: string } | { ok: false; status: number }> {
+  if (!/^[0-9a-f]{32}$/.test(userId)) return { ok: false, status: 404 };
+  let viewer: StoredUser;
+  try {
+    viewer = await userFromToken(store, token);
+  } catch {
+    return { ok: false, status: 401 };
+  }
+  if (viewer.id !== userId) {
+    const r = await houseOf(store, viewer);
+    if (!r || !r.h.members.some((m) => m.userId === userId)) return { ok: false, status: 403 };
+  }
+  const data = await store.get(photoKey(userId));
+  return data ? { ok: true, data } : { ok: false, status: 404 };
+}
+
 async function requireHouse(store: Store, u: StoredUser) {
   const r = await houseOf(store, u);
   if (!r) throw new HttpError(409, 'Você não faz mais parte desta casa.');
