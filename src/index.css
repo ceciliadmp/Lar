@@ -230,8 +230,9 @@ h1, h2, p { margin: 0; }
 
 /* Título "Tarefas" com o nome da casa como subtítulo; o botão + fica centralizado com os dois */
 .tasks__heading { min-width: 0; display: flex; flex-direction: column; }
-/* 4px entre o título e o subtítulo (home e Placar) */
-.title-l + .tasks__subtitle { margin-top: 4px; }
+/* 8px entre as letras do título e as do subtítulo (home e Placar). As caixas de texto
+   têm espaço vazio da fonte em cima e embaixo, por isso a margem é negativa. */
+.title-l + .tasks__subtitle { margin-top: -2px; }
 .tasks__subtitle {
   margin: 0;
   padding: 0 0 0 2px;
