@@ -142,7 +142,8 @@ h1, h2, p { margin: 0; }
 .tasks { height: 100%; display: flex; flex-direction: column; }
 .tasks__head { padding: 56px 24px 0; display: flex; flex-direction: column; }
 .tasks__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.tasks__body { flex-grow: 1; min-height: 0; overflow-y: auto; padding: 12px 24px 24px; }
+/* Espaçamentos do topo da home: linha do topo → título 16px, título → abas 12px, abas → conteúdo 16px. */
+.tasks__body { flex-grow: 1; min-height: 0; overflow-y: auto; padding: 16px 24px 24px; }
 .empty { padding: 64px 12px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
 .empty strong { font-size: 16px; font-weight: 600; }
 .empty span { font-size: 14px; color: var(--ink-3); }
@@ -187,7 +188,7 @@ h1, h2, p { margin: 0; }
 
 /* Seções por dia */
 .day { margin-top: 18px; }
-.day:first-child { margin-top: 6px; }
+.day:first-child { margin-top: 0; }
 .day__title { margin: 0 0 2px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 .day__title span { font-weight: 500; color: var(--ink-3); }
 .day__empty { padding: 14px 0 6px; font-size: 14px; color: var(--ink-3); }
@@ -204,7 +205,8 @@ h1, h2, p { margin: 0; }
 .task--done .task__title { color: var(--ink-3); text-decoration: line-through; }
 
 /* Título da home com o botão "Nova tarefa" à direita */
-.tasks__title { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tasks__tabs { margin-top: 12px; }
+.tasks__title { margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 /* Botão primário compacto: 36px visíveis, mas a área de toque continua com 44px. */
 .new-task-btn {
   position: relative;
@@ -375,7 +377,6 @@ h1, h2, p { margin: 0; }
   gap: 10px;
 }
 .house-link:hover, .score-mini:hover { background: var(--muted-fill); }
-.star { display: inline-flex; color: #b07800; }
 .score-mini__person { display: flex; align-items: center; gap: 4px; }
 .score-mini__person strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .score-mini__more { font-size: 13px; font-weight: 600; color: var(--ink-3); }

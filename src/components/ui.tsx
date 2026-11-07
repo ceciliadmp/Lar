@@ -79,7 +79,6 @@ const PATHS = {
       <path d="M21 13v1a4 4 0 0 1-4 4H3" />
     </>
   ),
-  star: <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z" />,
   users: (
     <>
       <circle cx="9" cy="8" r="3.5" />
@@ -112,7 +111,6 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   plus: [5, 5, 19, 19],
   close: [6, 6, 18, 18],
   repeat: [3, 2, 21, 22],
-  star: [3, 3, 21, 20.2],
   users: [2.5, 4.5, 21.5, 20],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
@@ -161,11 +159,3 @@ export function Icon({
   );
 }
 
-/** Estrela amarela dos pontos (contorno âmbar para aparecer bem em fundo claro). */
-export function Star({ size = 16 }: { size?: number }) {
-  return (
-    <span className="star" aria-hidden="true">
-      <Icon name="star" size={size} strokeWidth={1.5} fill="#F5B800" />
-    </span>
-  );
-}

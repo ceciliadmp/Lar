@@ -1,4 +1,4 @@
-import { Avatar, Button, Icon, IconButton, Star } from '../components/ui';
+import { Avatar, Button, Icon, IconButton } from '../components/ui';
 import type { Actions } from '../App';
 import {
   addDays,
@@ -74,7 +74,6 @@ export function Tasks({
           </button>
           {/* Pontos do mês de cada pessoa, à esquerda da foto; toque para ver o placar. */}
           <button type="button" className="score-mini" aria-label={scoreLabel} onClick={() => actions.go('score')}>
-            <Star size={18} />
             {table.slice(0, STRIP_MAX).map((row) => (
               <span key={row.memberId} className="score-mini__person" aria-hidden="true">
                 <strong>{row.points}</strong>
@@ -96,7 +95,7 @@ export function Tasks({
         </div>
 
 
-        <div className="segmented" role="group" aria-label="Período" style={{ marginTop: 18 }}>
+        <div className="segmented tasks__tabs" role="group" aria-label="Período">
           {PERIODS.map((p) => (
             <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
               {p.label}
@@ -107,7 +106,7 @@ export function Tasks({
 
       <div className="tasks__body">
         {showInvite && (
-          <div className="card" style={{ margin: '8px 0 12px' }}>
+          <div className="card" style={{ marginBottom: 12 }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>Sua casa está pronta</span>
             <span style={{ fontSize: 14, lineHeight: 1.45, color: 'var(--ink-2)' }}>
               Convide quem mora com você usando o código{' '}
