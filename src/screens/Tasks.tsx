@@ -17,11 +17,13 @@ import {
   type HouseView,
   type Occurrence,
   type Period,
+  type Task,
 } from '../state';
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: 'today', label: 'Hoje' },
   { id: 'week', label: 'Semana' },
+  { id: 'all', label: 'Todas' },
 ];
 
 /** Quantas pessoas aparecem no placar do topo antes de "+N". */
@@ -98,7 +100,7 @@ export function Tasks({
         </div>
 
 
-        <div className="segmented tasks__tabs" role="group" aria-label="Período">
+        <div className="segmented segmented--3 tasks__tabs" role="group" aria-label="Período">
           {PERIODS.map((p) => (
             <button key={p.id} type="button" aria-pressed={period === p.id} onClick={() => actions.setPeriod(p.id)}>
               {p.label}
@@ -126,6 +128,8 @@ export function Tasks({
             <strong>Nenhuma tarefa ainda</strong>
             <span>Toque em + para criar a primeira.</span>
           </div>
+        ) : period === 'all' ? (
+          <AllTasks view={s} actions={actions} />
         ) : (
           days.map((d) => {
             const list = sorted(d.items);
@@ -186,70 +190,164 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
       >
         <span className="task__box">{done && <Icon name="check" size={16} strokeWidth={3} />}</span>
       </button>
-      <div className="task__text">
-        <span className="task__title">
-          {t.repeat && (
-            <span className="task__repeat" title={describeRepeat(t.repeat)}>
-              <Icon name="repeat" size={16} />
-            </span>
-          )}
-          {t.title}
-          <span className="pts-tag" title={`Vale ${pts(t.points ?? 1)}`}>
-            <span aria-hidden="true">+{t.points ?? 1}</span>
-            <span className="sr-only">, vale {pts(t.points ?? 1)}</span>
-          </span>
-        </span>
-        <span className={o.lateFrom ? 'caption caption--late' : 'caption'}>{meta}</span>
-      </div>
+      <TaskText task={t} meta={meta} late={!!o.lateFrom} actions={actions} />
       <Avatar info={avatarFor(s, done ? o.doneBy : t.assignee)} />
       <IconButton label={`Excluir: ${t.title}`} className="task__delete" onClick={() => setConfirming(true)}>
         <Icon name="trash" size={18} />
       </IconButton>
-      {confirming &&
-        (t.repeat ? (
-          <ConfirmDialog
-            title="Excluir tarefa que se repete?"
-            onCancel={close}
-            actions={[
-              {
-                label: `Excluir só esta (${dayLabel(o.key)})`,
-                variant: 'secondary',
-                onClick: () => {
-                  close();
-                  actions.skipOccurrence(t.id, o.key);
-                },
-              },
-              {
-                label: 'Excluir todas',
-                variant: 'danger',
-                onClick: () => {
-                  close();
-                  actions.deleteTask(t.id);
-                },
-              },
-            ]}
-          >
-            “{t.title}” se repete ({describeRepeat(t.repeat)}). Você pode excluir só a de {dayLabel(o.key)} ou todas as
-            repetições, para todo mundo da casa.
-          </ConfirmDialog>
-        ) : (
-          <ConfirmDialog
-            title="Excluir tarefa?"
-            onCancel={close}
-            actions={[
-              {
-                label: 'Excluir',
-                variant: 'danger',
-                onClick: () => {
-                  close();
-                  actions.deleteTask(t.id);
-                },
-              },
-            ]}
-          >
-            “{t.title}” vai sumir para todo mundo da casa.
-          </ConfirmDialog>
-        ))}
+      {confirming && <DeleteDialog task={t} day={o.key} onClose={close} actions={actions} />}
     </li>
   );
 }
+
+/** Título e detalhes de uma tarefa; tocar abre a edição. */
+function TaskText({ task: t, meta, late, actions }: { task: Task; meta: string; late?: boolean; actions: Actions }) {
+  return (
+    <button type="button" className="task__text task__edit" onClick={() => actions.openEdit(t.id)}>
+      <span className="sr-only">Editar: </span>
+      <span className="task__title">
+        {t.title}
+        <span className="pts-tag" title={`Vale ${pts(t.points ?? 1)}`}>
+          <span aria-hidden="true">+{t.points ?? 1}</span>
+          <span className="sr-only">, vale {pts(t.points ?? 1)}</span>
+        </span>
+      </span>
+      <span className={late ? 'caption caption--late' : 'caption'}>{meta}</span>
+    </button>
+  );
+}
+
+/**
+ * Confirmação de exclusão. Recorrente vista num dia: só esta, todas ou cancelar.
+ * Recorrente na lista "Todas" (sem dia): excluir todas ou cancelar.
+ */
+function DeleteDialog({
+  task: t,
+  day,
+  onClose,
+  actions,
+}: {
+  task: Task;
+  day: string | null;
+  onClose: () => void;
+  actions: Actions;
+}) {
+  const removeAll = {
+    label: t.repeat ? 'Excluir todas' : 'Excluir',
+    variant: 'danger' as const,
+    onClick: () => {
+      onClose();
+      actions.deleteTask(t.id);
+    },
+  };
+  if (t.repeat && day) {
+    return (
+      <ConfirmDialog
+        title="Excluir tarefa que se repete?"
+        onCancel={onClose}
+        actions={[
+          {
+            label: `Excluir só esta (${dayLabel(day)})`,
+            variant: 'secondary',
+            onClick: () => {
+              onClose();
+              actions.skipOccurrence(t.id, day);
+            },
+          },
+          removeAll,
+        ]}
+      >
+        “{t.title}” se repete ({describeRepeat(t.repeat)}). Você pode excluir só a de {dayLabel(day)} ou todas as
+        repetições, para todo mundo da casa.
+      </ConfirmDialog>
+    );
+  }
+  return (
+    <ConfirmDialog
+      title={t.repeat ? 'Excluir tarefa que se repete?' : 'Excluir tarefa?'}
+      onCancel={onClose}
+      actions={[removeAll]}
+    >
+      {t.repeat
+        ? `“${t.title}” se repete (${describeRepeat(t.repeat)}) e vai sumir de todos os dias, para todo mundo da casa.`
+        : `“${t.title}” vai sumir para todo mundo da casa.`}
+    </ConfirmDialog>
+  );
+}
+
+/** Aba "Todas": cada tarefa atual uma vez só, sem caixa de marcar. */
+function AllTasks({ view: s, actions }: { view: HouseView; actions: Actions }) {
+  const todayKey = dayKey(new Date());
+  const byTitle = (a: Task, b: Task) => a.title.localeCompare(b.title, 'pt-BR');
+  const repeating = s.tasks.filter((t) => t.repeat).sort(byTitle);
+  // Avulsas atuais: de hoje em diante, ou atrasadas que ninguém fez.
+  const once = s.tasks
+    .filter((t) => !t.repeat && t.date && (t.date >= todayKey || !t.completions[t.date]))
+    .sort((a, b) => a.date!.localeCompare(b.date!) || byTitle(a, b));
+
+  const groups = [
+    { id: 'repeat', title: 'Toda semana', items: repeating },
+    { id: 'once', title: 'Avulsas', items: once },
+  ];
+
+  return (
+    <>
+      {groups.map((g) => (
+        <section key={g.id} className="day" aria-labelledby={`all-${g.id}`}>
+          <h2 id={`all-${g.id}`} className="day__title">
+            {g.title} <span>· {g.items.length}</span>
+          </h2>
+          {g.items.length === 0 ? (
+            <p className="day__empty">
+              {g.id === 'repeat' ? 'Nenhuma tarefa se repete.' : 'Nenhuma tarefa avulsa pendente.'}
+            </p>
+          ) : (
+            <ul className="list">
+              {g.items.map((t) => (
+                <AllRow key={t.id} task={t} view={s} todayKey={todayKey} actions={actions} />
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+    </>
+  );
+}
+
+function AllRow({
+  task: t,
+  view: s,
+  todayKey,
+  actions,
+}: {
+  task: Task;
+  view: HouseView;
+  todayKey: string;
+  actions: Actions;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const close = useCallback(() => setConfirming(false), []);
+  const late = !t.repeat && !!t.date && t.date < todayKey;
+  const when = t.repeat
+    ? capitalize(describeRepeat(t.repeat))
+    : late
+      ? capitalize(lateLabel(t.date!))
+      : capitalize(dayLabel(t.date!));
+  const meta = [
+    when,
+    `para ${t.assignee ? nameOf(s, t.assignee) : 'qualquer um'}`,
+    `criada por ${nameOf(s, t.createdBy)}`,
+  ].join(' · ');
+  return (
+    <li className="task task--all">
+      <TaskText task={t} meta={meta} late={late} actions={actions} />
+      <Avatar info={avatarFor(s, t.assignee)} />
+      <IconButton label={`Excluir: ${t.title}`} className="task__delete" onClick={() => setConfirming(true)}>
+        <Icon name="trash" size={18} />
+      </IconButton>
+      {confirming && <DeleteDialog task={t} day={null} onClose={close} actions={actions} />}
+    </li>
+  );
+}
+
+const capitalize = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);

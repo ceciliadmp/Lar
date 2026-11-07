@@ -16,7 +16,7 @@ import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
-import { Icon } from './components/ui';
+import { Button, Icon } from './components/ui';
 import { clearPhotos } from './photos';
 import { Members } from './screens/Members';
 import { NewTask } from './screens/NewTask';
@@ -40,6 +40,16 @@ export interface Actions {
   /** `day` é a chave do dia marcado (para recorrentes, cada dia conta separado). */
   toggleTask(id: number, day: string): void;
   addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null, points: number): void;
+  /** Abre a tela de editar uma tarefa. */
+  openEdit(id: number): void;
+  saveTask(
+    id: number,
+    title: string,
+    assignee: string | null,
+    date: string | null,
+    repeat: number[] | null,
+    points: number,
+  ): void;
   deleteTask(id: number): void;
   /** Tarefa que se repete: exclui só o dia `day`. */
   skipOccurrence(id: number, day: string): void;
@@ -66,9 +76,11 @@ export default function App() {
   const [view, setView] = useState<HouseView | null>(null);
   const [booting, setBooting] = useState(!!token && !resetToken);
   const [screen, setScreen] = useState<Screen>(resetToken ? 'reset' : 'welcome');
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [period, setPeriodState] = useState<Period>(() => {
     try {
       const p = localStorage.getItem('lar:period');
+      if (p === 'all') return 'all';
       return p === 'week' ? 'week' : 'today'; // "amanhã" (aba antiga) vira hoje
     } catch {
       return 'today';
@@ -85,7 +97,7 @@ export default function App() {
     setAccount(res.account);
     setView(res.view);
     if (!res.view) {
-      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'members' || s === 'score' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'members' || s === 'score' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -228,6 +240,20 @@ export default function App() {
       setScreen('tasks');
       void send({ action: 'addTask', token, title, assignee, date, repeat, points });
     },
+    openEdit: (id) => {
+      setEditingId(id);
+      setScreen('editTask');
+    },
+    saveTask: (id, title, assignee, date, repeat, points) => {
+      if (!token || !view) return;
+      // Volta para a home na hora, já com a tarefa mudada; a resposta do servidor confirma.
+      setView({
+        ...view,
+        tasks: view.tasks.map((t) => (t.id === id ? { ...t, title, assignee, date, repeat, points } : t)),
+      });
+      setScreen('tasks');
+      void send({ action: 'editTask', token, taskId: id, title, assignee, date, repeat, points });
+    },
     deleteTask: (id) => {
       if (!token || !view) return;
       setView({ ...view, tasks: view.tasks.filter((t) => t.id !== id) });
@@ -267,7 +293,8 @@ export default function App() {
     },
   };
 
-  const inHouse = screen === 'tasks' || screen === 'newTask' || screen === 'members' || screen === 'score';
+  const inHouse = ['tasks', 'newTask', 'editTask', 'members', 'score'].includes(screen);
+  const editing = view?.tasks.find((t) => t.id === editingId) ?? null;
 
   return (
     <main className="app">
@@ -288,6 +315,15 @@ export default function App() {
           {screen === 'score' && view && <Score view={view} actions={actions} />}
           {screen === 'members' && view && account && <Members view={view} account={account} actions={actions} />}
           {screen === 'newTask' && view && <NewTask view={view} actions={actions} />}
+          {screen === 'editTask' && view && editing && <NewTask key={editing.id} view={view} task={editing} actions={actions} />}
+          {screen === 'editTask' && view && !editing && (
+            <div className="screen loading">
+              Essa tarefa foi apagada.
+              <Button variant="secondary" style={{ marginTop: 16, padding: '0 20px' }} onClick={() => actions.go('tasks')}>
+                Voltar para tarefas
+              </Button>
+            </div>
+          )}
           {screen === 'profile' && account && (
             <Profile
               account={account}

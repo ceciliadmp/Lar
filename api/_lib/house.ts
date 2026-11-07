@@ -166,6 +166,16 @@ export type Request =
       points: number;
     }>
   | Authed<{ action: 'toggleTask'; taskId: number; date: string }>
+  /** Muda texto, responsável, quando e pontos. Pontos já ganhos não mudam. */
+  | Authed<{
+      action: 'editTask';
+      taskId: number;
+      title: string;
+      assignee: string | null;
+      date: string | null;
+      repeat: number[] | null;
+      points: number;
+    }>
   | Authed<{ action: 'deleteTask'; taskId: number }>
   /** Recorrente: some só no dia `date`; as outras repetições continuam. */
   | Authed<{ action: 'skipOccurrence'; taskId: number; date: string }>
@@ -749,6 +759,33 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       const points = Number(req.points ?? 1);
       if (![1, 2, 3].includes(points)) throw new HttpError(400, 'A tarefa vale 1, 2 ou 3 pontos.');
       h.tasks.unshift({ id: h.nextTaskId++, title, assignee, createdBy: me.id, date, repeat, completions: {}, points });
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'editTask': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const t = h.tasks.find((x) => x.id === req.taskId);
+      if (!t) throw new HttpError(404, 'Essa tarefa foi apagada.');
+      const repeat = req.repeat != null ? cleanRepeat(req.repeat) : null;
+      const date = repeat ? null : cleanDate(req.date);
+      const points = Number(req.points ?? 1);
+      if (![1, 2, 3].includes(points)) throw new HttpError(400, 'A tarefa vale 1, 2 ou 3 pontos.');
+      t.title = cleanText(req.title, 'a tarefa', 120);
+      t.assignee = h.members.some((m) => m.id === req.assignee) ? req.assignee : null;
+      t.points = points;
+      if (repeat) {
+        t.repeat = repeat;
+        t.date = null;
+      } else {
+        // Virou (ou continua) avulsa: só vale a conclusão do dia dela.
+        const done = t.completions[date!];
+        t.completions = done ? { [date!]: done } : {};
+        t.repeat = null;
+        t.date = date;
+        delete t.skips;
+      }
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }

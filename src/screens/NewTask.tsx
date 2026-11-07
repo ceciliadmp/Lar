@@ -1,20 +1,37 @@
 import { useState } from 'react';
 import { BackButton, Button, Chip, TextField } from '../components/ui';
 import type { Actions } from '../App';
-import { dayKey, WEEK_ORDER, weekdayShort, type HouseView } from '../state';
+import { dayKey, shortDayLabel, WEEK_ORDER, weekdayShort, type HouseView, type Task } from '../state';
 
 type Mode = 'once' | 'repeat';
 
-/** Tela cheia para criar uma tarefa; ao adicionar, volta sozinha para a home. */
-export function NewTask({ view: s, actions }: { view: HouseView; actions: Actions }) {
+/**
+ * Tela cheia para criar uma tarefa, ou editar uma (com `task`).
+ * Ao salvar, volta sozinha para a home.
+ */
+export function NewTask({ view: s, task, actions }: { view: HouseView; task?: Task; actions: Actions }) {
   const today = new Date();
-  const [title, setTitle] = useState('');
-  const [assignee, setAssignee] = useState<string | null>(null);
-  const [mode, setMode] = useState<Mode>('once');
+  const todayKey = dayKey(today);
+  const [title, setTitle] = useState(task?.title ?? '');
+  const [assignee, setAssignee] = useState<string | null>(task?.assignee ?? null);
+  const [mode, setMode] = useState<Mode>(task?.repeat ? 'repeat' : 'once');
   // Mínimo obrigatório: 1 ponto, já marcado.
-  const [points, setPoints] = useState(1);
-  const [repeat, setRepeat] = useState<number[]>([today.getDay()]);
-  const disabled = !title.trim() || (mode === 'repeat' && repeat.length === 0);
+  const [points, setPoints] = useState(task?.points ?? 1);
+  const [repeat, setRepeat] = useState<number[]>(task?.repeat ?? [today.getDay()]);
+
+  // Avulsa nova é para hoje; avulsa editada mantém o dia dela.
+  const onceDate = task?.date ?? todayKey;
+  const onceLabel = onceDate === todayKey ? 'Só hoje' : `Uma vez (${shortDayLabel(onceDate)})`;
+
+  const unchanged =
+    !!task &&
+    title.trim() === task.title &&
+    assignee === task.assignee &&
+    points === (task.points ?? 1) &&
+    (mode === 'repeat'
+      ? !!task.repeat && [...repeat].sort().join() === [...task.repeat].sort().join()
+      : !task.repeat);
+  const disabled = !title.trim() || (mode === 'repeat' && repeat.length === 0) || unchanged;
 
   const people = [
     { id: null as string | null, label: 'Qualquer um' },
@@ -30,18 +47,14 @@ export function NewTask({ view: s, actions }: { view: HouseView; actions: Action
       onSubmit={(e) => {
         e.preventDefault();
         if (disabled) return;
-        // Avulsa é sempre para hoje.
-        actions.addTask(
-          title.trim(),
-          assignee,
-          mode === 'once' ? dayKey(today) : null,
-          mode === 'repeat' ? repeat : null,
-          points,
-        );
+        const date = mode === 'once' ? onceDate : null;
+        const days = mode === 'repeat' ? repeat : null;
+        if (task) actions.saveTask(task.id, title.trim(), assignee, date, days, points);
+        else actions.addTask(title.trim(), assignee, date, days, points);
       }}
     >
       <BackButton label="Cancelar e voltar para tarefas" onClick={() => actions.go('tasks')} />
-      <h1 className="title-m" style={{ marginTop: 16 }}>Nova tarefa</h1>
+      <h1 className="title-m" style={{ marginTop: 16 }}>{task ? 'Editar tarefa' : 'Nova tarefa'}</h1>
 
       <div className="fields" style={{ marginTop: 24, gap: 24 }}>
         <TextField
@@ -57,7 +70,7 @@ export function NewTask({ view: s, actions }: { view: HouseView; actions: Action
           <span className="field-label" id="when-label">Quando?</span>
           <div className="segmented" role="radiogroup" aria-labelledby="when-label">
             <button type="button" role="radio" aria-checked={mode === 'once'} onClick={() => setMode('once')}>
-              Só hoje
+              {onceLabel}
             </button>
             <button type="button" role="radio" aria-checked={mode === 'repeat'} onClick={() => setMode('repeat')}>
               Toda semana
@@ -99,7 +112,7 @@ export function NewTask({ view: s, actions }: { view: HouseView; actions: Action
 
       <div className="spacer" style={{ minHeight: 24 }} />
       <Button type="submit" disabled={disabled}>
-        Adicionar tarefa
+        {task ? 'Salvar alterações' : 'Adicionar tarefa'}
       </Button>
     </form>
   );
