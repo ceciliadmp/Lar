@@ -1,9 +1,10 @@
 import type { TabScreen } from '../state';
 import { Icon } from './ui';
 
-const TABS: { screen: TabScreen; label: string; icon: 'tasks' | 'chart' | 'sliders' }[] = [
+const TABS: { screen: TabScreen; label: string; icon: 'tasks' | 'podium' | 'trend' | 'sliders' }[] = [
   { screen: 'tasks', label: 'Tarefas', icon: 'tasks' },
-  { screen: 'score', label: 'Placar', icon: 'chart' },
+  { screen: 'score', label: 'Placar', icon: 'podium' },
+  { screen: 'metrics', label: 'Métricas', icon: 'trend' },
   { screen: 'settings', label: 'Configurações', icon: 'sliders' },
 ];
 

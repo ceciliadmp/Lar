@@ -12,6 +12,7 @@ import {
   type Account,
   type GamePeriod,
   type Period,
+  type StatsView,
   type HouseView,
   type Screen,
 } from './state';
@@ -19,6 +20,7 @@ import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
+import { Metrics } from './screens/Metrics';
 import { Button, Icon } from './components/ui';
 import { clearPhotos } from './photos';
 import { Settings } from './screens/Settings';
@@ -64,6 +66,8 @@ export interface Actions {
   newCode(): void;
   /** Só o admin: muda o nome da casa. */
   renameHouse(name: string): Promise<string | null>;
+  /** Métricas da casa (tarefas feitas por dia); null se falhar. */
+  getStats(): Promise<StatsView | null>;
   /** Foto como data URL JPEG, ou null para remover. */
   setPhoto(photo: string | null): Promise<string | null>;
   setGame(period: GamePeriod, closingDay: number, reward: string): Promise<string | null>;
@@ -111,7 +115,7 @@ export default function App() {
     setAccount(res.account);
     setView(res.view);
     if (!res.view) {
-      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'settings' || s === 'score' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'settings' || s === 'score' || s === 'metrics' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -313,6 +317,11 @@ export default function App() {
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),
+    getStats: async () => {
+      if (!token) return null;
+      const res = await send({ action: 'getStats', token });
+      return res?.stats ?? null;
+    },
     renameHouse: (name) =>
       attempt(async () => {
         const res = await api({ action: 'renameHouse', token: token!, name });
@@ -352,7 +361,7 @@ export default function App() {
     },
   };
 
-  const inHouse = ['tasks', 'newTask', 'editTask', 'settings', 'score'].includes(screen);
+  const inHouse = ['tasks', 'newTask', 'editTask', 'settings', 'score', 'metrics'].includes(screen);
   const tab = view && isTabScreen(screen) ? screen : null;
   const editing = view?.tasks.find((t) => t.id === editingId) ?? null;
 
@@ -376,6 +385,7 @@ export default function App() {
               <div className="tab-layout__content">
                 {tab === 'tasks' && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
                 {tab === 'score' && <Score view={view} actions={actions} />}
+                {tab === 'metrics' && <Metrics view={view} actions={actions} />}
                 {tab === 'settings' && account && <Settings view={view} account={account} actions={actions} />}
               </div>
               <TabBar current={tab} onGo={(s) => actions.go(s)} />

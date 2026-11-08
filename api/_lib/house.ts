@@ -221,6 +221,8 @@ export type Request =
   | Authed<{ action: 'setGame'; period?: GamePeriod; closingDay: number; reward: string }>
   /** Tira 1 ponto de outra pessoa da casa, com justificativa curta. */
   | Authed<{ action: 'takePoint'; memberId: string; reason: string }>
+  /** Métricas da casa (tarefas feitas por dia). */
+  | Authed<{ action: 'getStats' }>
   /** A pessoa fecha o aviso de ponto perdido na home. */
   | Authed<{ action: 'dismissPenalty'; penaltyId: string }>
   | Authed<{ action: 'stopGame' }>
@@ -228,8 +230,18 @@ export type Request =
   | Authed<{ action: 'setPhoto'; photo: string | null }>
   | Authed<{ action: 'leave' }>;
 
+/** Dia ('AAAA-MM-DD', no fuso da casa) → id do membro → tarefas feitas. */
+export type DayCounts = Record<string, Record<string, number>>;
+
+export interface StatsView {
+  today: string;
+  days: DayCounts;
+  /** Quem já saiu da casa aparece com o nome guardado. */
+  names: Record<string, string>;
+}
+
 export type Response =
-  | { ok: true; token?: string; account: Account | null; view: HouseView | null }
+  | { ok: true; token?: string; account: Account | null; view: HouseView | null; stats?: StatsView }
   | { ok: false; status: number; error: string };
 
 class HttpError extends Error {
@@ -249,6 +261,8 @@ const emailKey = (email: string) => `lar:email:${email}`;
 const sessionKey = (token: string) => `lar:session:${token}`;
 const attemptsKey = (email: string) => `lar:login-attempts:${email}`;
 export const photoKey = (userId: string) => `lar:photo:${userId}`;
+/** Métricas: tarefas feitas por dia e por pessoa, guardadas sem prazo (para ver por ano). */
+const statsKey = (houseId: string) => `lar:stats:${houseId}`;
 /** Fotos de perfil: JPEG quadrado, já reduzido no aparelho. */
 const MAX_PHOTO_CHARS = 400_000;
 
@@ -509,6 +523,34 @@ function gameView(h: StoredHouse): GameView {
     standings: standings(h, r.start, r.end),
     history: g?.history ?? [],
   };
+}
+
+/* ---------- métricas ---------- */
+
+interface StoredStats {
+  days: DayCounts;
+  names: Record<string, string>;
+}
+
+/** Lê as métricas; na primeira vez, monta a partir dos pontos dos últimos 70 dias. */
+async function loadStats(store: Store, h: StoredHouse): Promise<StoredStats> {
+  const raw = await store.get(statsKey(h.id));
+  if (raw) return JSON.parse(raw) as StoredStats;
+  const st: StoredStats = { days: {}, names: {} };
+  for (const e of h.score ?? []) if (e.t !== 0 && (e.p ?? 1) > 0) bump(st, e.d, e.m, 1);
+  return st;
+}
+
+function bump(st: StoredStats, day: string, member: string, n: number) {
+  const d = (st.days[day] ??= {});
+  d[member] = Math.max(0, (d[member] ?? 0) + n);
+  if (!d[member]) delete d[member];
+  if (!Object.keys(d).length) delete st.days[day];
+}
+
+async function saveStats(store: Store, h: StoredHouse, st: StoredStats) {
+  for (const m of h.members) st.names[m.id] = m.name;
+  await store.set(statsKey(h.id), JSON.stringify(st));
 }
 
 /* ---------- leitura e gravação ---------- */
@@ -903,8 +945,11 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       // Avulsa: uma única conclusão. Recorrente: uma por dia.
       const day = t.date ?? cleanDate(req.date);
       h.score ??= [];
+      const stats = await loadStats(store, h);
       if (t.completions[day]) {
         delete t.completions[day];
+        // Desmarcou: tira da métrica do dia e da pessoa em que tinha contado.
+        for (const e of h.score) if (e.t === t.id && e.k === day) bump(stats, e.d, e.m, -1);
         h.score = h.score.filter((e) => !(e.t === t.id && e.k === day));
       } else {
         // Tarefa com responsável: dá para marcar por ela, e conta como feita por ela.
@@ -913,8 +958,10 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         t.completions[day] = doer;
         // Os pontos da tarefa vão para quem fez, no dia em que foi marcada.
         h.score.push({ m: doer, d: todayIn(h), t: t.id, k: day, p: t.points ?? 1 });
+        bump(stats, todayIn(h), doer, 1);
       }
       await saveHouse(store, h);
+      await saveStats(store, h, stats);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 
@@ -1011,6 +1058,14 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 
+    case 'getStats': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const st = await loadStats(store, h);
+      for (const m of h.members) st.names[m.id] = m.name;
+      return { ok: true, account: account(u), view: view(h, me.id), stats: { today: todayIn(h), days: st.days, names: st.names } };
+    }
+
     case 'dismissPenalty': {
       const u = await userFromToken(store, req.token);
       const { h, me } = await requireHouse(store, u);
@@ -1064,6 +1119,7 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         if (h.members.length === 0) {
           await store.del(codeKey(h.code));
           await store.del(houseKey(h.id));
+          await store.del(statsKey(h.id));
         } else {
           // Se o administrador sai, quem entrou primeiro assume.
           if (me.role === 'admin' && !h.members.some((m) => m.role === 'admin')) h.members[0].role = 'admin';

@@ -8,14 +8,16 @@ import type {
   Request,
   Response,
   RoundResult,
+  StatsView,
   Task,
 } from '../api/_lib/house';
 
-export type { Account, GamePeriod, GameView, HouseView, Penalty, RoundResult, Task };
-export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'editTask' | 'settings' | 'score' | 'profile';
+export type { Account, GamePeriod, GameView, HouseView, Penalty, RoundResult, StatsView, Task };
+export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'editTask' | 'settings' | 'score' | 'metrics' | 'profile';
 /** Telas com a barra de abas embaixo. */
-export type TabScreen = 'tasks' | 'score' | 'settings';
-export const isTabScreen = (s: Screen): s is TabScreen => s === 'tasks' || s === 'score' || s === 'settings';
+export type TabScreen = 'tasks' | 'score' | 'metrics' | 'settings';
+export const isTabScreen = (s: Screen): s is TabScreen =>
+  s === 'tasks' || s === 'score' || s === 'metrics' || s === 'settings';
 /** O que a tela de tarefas mostra. */
 export type Period = 'today' | 'week' | 'all';
 

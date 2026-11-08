@@ -104,6 +104,8 @@ const PATHS = {
     </>
   ),
   chart: <path d="M4 20h16M7 20v-7M12 20V5M17 20v-10" />,
+  podium: <path d="M3 21h18M4 21v-6h5v6M9.5 21V9h5v12M15 21v-8h5v8" />,
+  trend: <path d="M3 4v16h17M7 15l4-4 3 3 6-6" />,
   sliders: (
     <>
       <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
@@ -140,6 +142,8 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   more: [3, 3, 21, 21],
   tasks: [3, 5, 21, 19.5],
   chart: [4, 5, 20, 20],
+  podium: [3, 9, 21, 21],
+  trend: [3, 4, 20, 20],
   sliders: [4, 4.8, 20, 19.2],
   trash: [4, 4, 20, 21],
   copy: [5, 3, 20, 20],
@@ -157,18 +161,24 @@ export function Icon({
   size = 20,
   strokeWidth = 2,
   fill = 'none',
+  min = 'both',
 }: {
   name: keyof typeof PATHS;
   size?: number;
   strokeWidth?: number;
   /** Cor de preenchimento (ícones são só contorno por padrão). */
   fill?: string;
+  /**
+   * "both" (padrão): os dois lados do desenho com pelo menos 16px.
+   * "larger": só o lado maior com 16px (para desenhos achatados, como o check).
+   */
+  min?: 'both' | 'larger';
 }) {
   const [x0, y0, x1, y1] = BOUNDS[name];
   const w = x1 - x0;
   const h = y1 - y0;
   // `size` vale para o lado maior; e nenhum dos dois lados fica abaixo de 16px.
-  const scale = Math.max(size / Math.max(w, h), MIN_ICON / Math.min(w, h));
+  const scale = Math.max(size / Math.max(w, h), MIN_ICON / (min === 'both' ? Math.min(w, h) : Math.max(w, h)));
   const pad = strokeWidth / 2;
   return (
     <svg

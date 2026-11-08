@@ -209,7 +209,7 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
         aria-pressed={done}
         onClick={() => actions.toggleTask(t.id, o.key)}
       >
-        <span className="task__box">{done && <Icon name="check" size={16} strokeWidth={3} />}</span>
+        <span className="task__box">{done && <Icon name="check" size={16} strokeWidth={2.6} min="larger" />}</span>
       </button>
       <TaskText task={t} meta={meta} late={!!o.lateFrom} />
       <Avatar info={avatarFor(s, done ? o.doneBy : t.assignee)} />
