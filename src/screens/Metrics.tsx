@@ -42,25 +42,28 @@ interface Bucket {
   current: boolean;
 }
 
-/** Os períodos do gráfico: 14 dias, 12 semanas, 12 meses ou os anos com dados. */
+/** Os períodos do gráfico: 7 dias, 4 semanas, 12 meses ou os anos com dados. */
 function buckets(range: Range, today: string, firstDay: string | null): Bucket[] {
   const out: Bucket[] = [];
   if (range === 'day') {
-    for (let i = 13; i >= 0; i--) {
+    for (let i = 6; i >= 0; i--) {
       const k = plusDays(today, -i);
       const d = parse(k);
-      out.push({ id: k, label: String(d.getDate()), full: `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`, start: k, end: k, current: i === 0 });
+      out.push({ id: k, label: `${WEEKDAYS[d.getDay()]} ${d.getDate()}`, full: `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`, start: k, end: k, current: i === 0 });
     }
   } else if (range === 'week') {
     const ws = weekStart(today);
-    for (let i = 11; i >= 0; i--) {
+    for (let i = 3; i >= 0; i--) {
       const s = plusDays(ws, -7 * i);
       const e = plusDays(s, 6);
       const d = parse(s);
       const de = parse(e);
       out.push({
         id: s,
-        label: `${d.getDate()}/${d.getMonth() + 1}`,
+        label:
+          d.getMonth() === de.getMonth()
+            ? `${d.getDate()}–${de.getDate()} ${MONTHS[d.getMonth()]}`
+            : `${d.getDate()}/${d.getMonth() + 1}–${de.getDate()}/${de.getMonth() + 1}`,
         full: `semana de ${d.getDate()} ${MONTHS[d.getMonth()]} a ${de.getDate()} ${MONTHS[de.getMonth()]}`,
         start: s,
         end: e,
@@ -151,7 +154,12 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
     return { tiles, bs, people, any: days.length > 0 };
   }, [stats, range, s.members]);
 
-  const rangeText = { day: 'nos últimos 14 dias', week: 'nas últimas 12 semanas', month: 'nos últimos 12 meses', year: 'por ano' }[range];
+  const rangeText = {
+    day: 'nos últimos 7 dias',
+    week: 'nas últimas 4 semanas',
+    month: 'nos últimos 12 meses',
+    year: 'por ano',
+  }[range];
 
   return (
     <div className="screen tab-screen">
@@ -162,20 +170,6 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
         <p className="day__empty" style={{ marginTop: 24 }}>{failed ? 'Não foi possível carregar o histórico.' : 'Carregando…'}</p>
       ) : (
         <>
-          <div className="kpis">
-            {data.tiles.map((k) => (
-              <div key={k.label} className="kpi">
-                <span className="kpi__label">{k.label}</span>
-                <span className="kpi__value">{k.value}</span>
-                {k.prev !== null && (
-                  <span className="kpi__delta">
-                    {k.prevLabel}: {k.prev}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
           <div className="segmented metrics__ranges" role="group" aria-label="Agrupar por">
             {RANGES.map((r) => (
               <button key={r.id} type="button" aria-pressed={range === r.id} onClick={() => setRange(r.id)}>
@@ -186,7 +180,7 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
 
           <h2 className="section-title">Tarefas feitas {rangeText}</h2>
           {data.any ? (
-            <BarChart bars={data.bs} range={range} />
+            <BarChart bars={data.bs} />
           ) : (
             <p className="day__empty">Ainda não há tarefas feitas. Quando alguém marcar uma tarefa, ela aparece aqui.</p>
           )}
@@ -213,6 +207,21 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
               );
             })}
           </ul>
+
+          <h2 className="section-title">Totais</h2>
+          <div className="kpis">
+            {data.tiles.map((k) => (
+              <div key={k.label} className="kpi">
+                <span className="kpi__label">{k.label}</span>
+                <span className="kpi__value">{k.value}</span>
+                {k.prev !== null && (
+                  <span className="kpi__delta">
+                    {k.prevLabel}: {k.prev}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         </>
       )}
     </div>
@@ -237,12 +246,13 @@ function niceMax(v: number) {
 
 /** A dica fica dentro do gráfico: nas pontas, alinha pela borda em vez de centralizar. */
 function tipAlign(i: number, n: number): 'start' | 'center' | 'end' {
-  if (n > 4 && i <= 1) return 'start';
-  if (n > 4 && i >= n - 2) return 'end';
+  const edge = n > 6 ? 2 : 1; // com barras estreitas, as duas da ponta; com largas, só a da ponta
+  if (i < edge) return 'start';
+  if (i >= n - edge) return 'end';
   return 'center';
 }
 
-function BarChart({ bars, range }: { bars: (Bucket & { value: number })[]; range: Range }) {
+function BarChart({ bars }: { bars: (Bucket & { value: number })[] }) {
   const [hover, setHover] = useState<string | null>(null);
   const max = niceMax(Math.max(...bars.map((b) => b.value)));
   const ticks = [0, max / 2, max];
@@ -255,9 +265,6 @@ function BarChart({ bars, range }: { bars: (Bucket & { value: number })[]; range
   const hovered = bars.find((b) => b.id === hover);
   // Rótulo direto só no período atual e no maior valor (nunca em todas as barras).
   const labelled = new Set(bars.filter((b) => (b.current || (b.value === top && top > 0)) && b.value > 0).map((b) => b.id));
-  // Muitos rótulos no eixo (dias e semanas): mostra um sim, um não, sempre o atual.
-  const showTick = (i: number) =>
-    (range !== 'day' && range !== 'week') || (bars.length - 1 - i) % 2 === 0;
 
   return (
     <div className="chart">
@@ -296,11 +303,9 @@ function BarChart({ bars, range }: { bars: (Bucket & { value: number })[]; range
                   {b.value}
                 </text>
               )}
-              {showTick(i) && (
-                <text x={cx} y={H - 8} textAnchor="middle" className={b.current ? 'chart__label is-current' : 'chart__label'}>
-                  {b.label}
-                </text>
-              )}
+              <text x={cx} y={H - 8} textAnchor="middle" className={b.current ? 'chart__label is-current' : 'chart__label'}>
+                {b.label}
+              </text>
             </g>
           );
         })}
