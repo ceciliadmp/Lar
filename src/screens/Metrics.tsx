@@ -93,7 +93,7 @@ function buckets(range: Range, today: string, firstDay: string | null): Bucket[]
 
 const count = (n: number) => (n === 1 ? '1 tarefa' : `${n} tarefas`);
 
-/** Aba Métricas: quantas tarefas foram feitas por dia, semana, mês ou ano. */
+/** Aba Histórico: quantas tarefas foram feitas por dia, semana, mês ou ano. */
 export function Metrics({ view: s, actions }: { view: HouseView; actions: Actions }) {
   const [stats, setStats] = useState<StatsView | null>(null);
   const [failed, setFailed] = useState(false);
@@ -155,11 +155,11 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
 
   return (
     <div className="screen tab-screen">
-      <h1 className="title-l">Métricas</h1>
+      <h1 className="title-l">Histórico</h1>
       <p className="tasks__subtitle">{s.house.name}</p>
 
       {!data ? (
-        <p className="day__empty" style={{ marginTop: 24 }}>{failed ? 'Não foi possível carregar as métricas.' : 'Carregando…'}</p>
+        <p className="day__empty" style={{ marginTop: 24 }}>{failed ? 'Não foi possível carregar o histórico.' : 'Carregando…'}</p>
       ) : (
         <>
           <div className="kpis">
