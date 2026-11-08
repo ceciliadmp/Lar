@@ -189,6 +189,18 @@ export type Request =
       points: number;
     }>
   | Authed<{ action: 'toggleTask'; taskId: number; date: string }>
+  /**
+   * Tarefa que se repete: muda só o dia `date`. Esse dia sai da repetição e vira
+   * uma tarefa avulsa com os dados novos (a conclusão e os pontos daquele dia vão junto).
+   */
+  | Authed<{
+      action: 'editOccurrence';
+      taskId: number;
+      date: string;
+      title: string;
+      assignee: string | null;
+      points: number;
+    }>
   /** Muda texto, responsável, quando e pontos. Pontos já ganhos não mudam. */
   | Authed<{
       action: 'editTask';
@@ -853,6 +865,36 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 
+    case 'editOccurrence': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const t = h.tasks.find((x) => x.id === req.taskId);
+      if (!t) throw new HttpError(404, 'Essa tarefa foi apagada.');
+      if (!t.repeat) throw new HttpError(400, 'Essa tarefa não se repete.');
+      const day = cleanDate(req.date);
+      const points = Number(req.points ?? 1);
+      if (![1, 2, 3].includes(points)) throw new HttpError(400, 'A tarefa vale 1, 2 ou 3 pontos.');
+      if (h.tasks.length >= 500) throw new HttpError(409, 'A casa já tem tarefas demais. Apague algumas.');
+      const id = h.nextTaskId++;
+      const done = t.completions[day];
+      h.tasks.unshift({
+        id,
+        title: cleanText(req.title, 'a tarefa', 120),
+        assignee: h.members.some((m) => m.id === req.assignee) ? req.assignee : null,
+        createdBy: t.createdBy,
+        date: day,
+        repeat: null,
+        completions: done ? { [day]: done } : {},
+        points,
+      });
+      // O dia sai da repetição; a conclusão e os pontos daquele dia passam para a tarefa nova.
+      delete t.completions[day];
+      t.skips = [...new Set([...(t.skips ?? []), day])].sort();
+      for (const e of h.score ?? []) if (e.t === t.id && e.k === day) e.t = id;
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
     case 'toggleTask': {
       const u = await userFromToken(store, req.token);
       const { h, me } = await requireHouse(store, u);
@@ -865,9 +907,12 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         delete t.completions[day];
         h.score = h.score.filter((e) => !(e.t === t.id && e.k === day));
       } else {
-        t.completions[day] = me.id;
-        // Os pontos da tarefa vão para quem fez, no dia em que fez.
-        h.score.push({ m: me.id, d: todayIn(h), t: t.id, k: day, p: t.points ?? 1 });
+        // Tarefa com responsável: dá para marcar por ela, e conta como feita por ela.
+        // Sem responsável ("qualquer um"): quem marca é quem fez.
+        const doer = t.assignee && h.members.some((m) => m.id === t.assignee) ? t.assignee : me.id;
+        t.completions[day] = doer;
+        // Os pontos da tarefa vão para quem fez, no dia em que foi marcada.
+        h.score.push({ m: doer, d: todayIn(h), t: t.id, k: day, p: t.points ?? 1 });
       }
       await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };

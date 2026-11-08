@@ -197,6 +197,8 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
 
   const [confirming, setConfirming] = useState(false);
   const close = useCallback(() => setConfirming(false), []);
+  const [choosingEdit, setChoosingEdit] = useState(false);
+  const closeEdit = useCallback(() => setChoosingEdit(false), []);
 
   return (
     <li className={done ? 'task task--done' : 'task'}>
@@ -214,11 +216,39 @@ function TaskRow({ o, view: s, actions }: { o: Occurrence; view: HouseView; acti
       <RowMenu
         label={`Opções: ${t.title}`}
         items={[
-          { label: 'Editar', onSelect: () => actions.openEdit(t.id) },
+          // Tarefa que se repete: pergunta se é só este dia ou todas.
+          { label: 'Editar', onSelect: () => (t.repeat ? setChoosingEdit(true) : actions.openEdit(t.id)) },
           { label: 'Excluir', danger: true, onSelect: () => setConfirming(true) },
         ]}
       />
       {confirming && <DeleteDialog task={t} day={o.key} onClose={close} actions={actions} />}
+      {choosingEdit && t.repeat && (
+        <ConfirmDialog
+          title="Editar tarefa que se repete?"
+          onCancel={closeEdit}
+          actions={[
+            {
+              label: `Editar só esta (${dayLabel(o.key)})`,
+              variant: 'secondary',
+              onClick: () => {
+                closeEdit();
+                actions.openEdit(t.id, o.key);
+              },
+            },
+            {
+              label: 'Editar todas',
+              variant: 'primary',
+              onClick: () => {
+                closeEdit();
+                actions.openEdit(t.id);
+              },
+            },
+          ]}
+        >
+          “{t.title}” se repete ({describeRepeat(t.repeat)}). Você pode mudar só a de {dayLabel(o.key)} ou todas as
+          repetições.
+        </ConfirmDialog>
+      )}
     </li>
   );
 }

@@ -45,7 +45,10 @@ export interface Actions {
   toggleTask(id: number, day: string): void;
   addTask(title: string, assignee: string | null, date: string | null, repeat: number[] | null, points: number): void;
   /** Abre a tela de editar uma tarefa. */
-  openEdit(id: number): void;
+  /** `day`: tarefa que se repete, editar só esse dia. */
+  openEdit(id: number, day?: string): void;
+  /** Muda só um dia de uma tarefa que se repete. */
+  saveOccurrence(id: number, day: string, title: string, assignee: string | null, points: number): void;
   saveTask(
     id: number,
     title: string,
@@ -87,6 +90,7 @@ export default function App() {
   const [booting, setBooting] = useState(!!token && !resetToken);
   const [screen, setScreen] = useState<Screen>(resetToken ? 'reset' : 'welcome');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingDay, setEditingDay] = useState<string | null>(null);
   const [period, setPeriodState] = useState<Period>(() => {
     try {
       const p = localStorage.getItem('lar:period');
@@ -232,7 +236,11 @@ export default function App() {
           if (t.id !== id) return t;
           const completions = { ...t.completions };
           if (completions[day]) delete completions[day];
-          else completions[day] = view.meId;
+          // Com responsável, conta como feita por ele; sem, por quem marcou.
+          else {
+            const assigned = t.assignee && view.members.some((m) => m.id === t.assignee);
+            completions[day] = assigned ? t.assignee! : view.meId;
+          }
           return { ...t, completions };
         }),
       });
@@ -251,8 +259,9 @@ export default function App() {
       setScreen('tasks');
       void send({ action: 'addTask', token, title, assignee, date, repeat, points });
     },
-    openEdit: (id) => {
+    openEdit: (id, day) => {
       setEditingId(id);
+      setEditingDay(day ?? null);
       setScreen('editTask');
     },
     saveTask: (id, title, assignee, date, repeat, points) => {
@@ -264,6 +273,30 @@ export default function App() {
       });
       setScreen('tasks');
       void send({ action: 'editTask', token, taskId: id, title, assignee, date, repeat, points });
+    },
+    saveOccurrence: (id, day, title, assignee, points) => {
+      if (!token || !view) return;
+      // Na hora: o dia sai da repetição e aparece a versão avulsa; o servidor confirma.
+      const old = view.tasks.find((t) => t.id === id);
+      const done = old?.completions[day];
+      setView({
+        ...view,
+        tasks: [
+          {
+            id: -Date.now(),
+            title,
+            assignee,
+            createdBy: old?.createdBy ?? view.meId,
+            date: day,
+            repeat: null,
+            completions: done ? { [day]: done } : {},
+            points,
+          },
+          ...view.tasks.map((t) => (t.id === id ? { ...t, skips: [...(t.skips ?? []), day] } : t)),
+        ],
+      });
+      setScreen('tasks');
+      void send({ action: 'editOccurrence', token, taskId: id, date: day, title, assignee, points });
     },
     deleteTask: (id) => {
       if (!token || !view) return;
@@ -349,7 +382,15 @@ export default function App() {
             </div>
           )}
           {screen === 'newTask' && view && <NewTask view={view} actions={actions} />}
-          {screen === 'editTask' && view && editing && <NewTask key={editing.id} view={view} task={editing} actions={actions} />}
+          {screen === 'editTask' && view && editing && (
+            <NewTask
+              key={`${editing.id}-${editingDay ?? 'todas'}`}
+              view={view}
+              task={editing}
+              onlyDay={editing.repeat ? (editingDay ?? undefined) : undefined}
+              actions={actions}
+            />
+          )}
           {screen === 'editTask' && view && !editing && (
             <div className="screen loading">
               Essa tarefa foi apagada.

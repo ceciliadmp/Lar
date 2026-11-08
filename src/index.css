@@ -514,3 +514,14 @@ h1, h2, p { margin: 0; }
 .profile--compact .profile__name { font-size: 17px; }
 .profile__actions--row { margin-top: 12px; flex-direction: row; flex-wrap: wrap; gap: 8px; }
 .account { margin-top: 28px; }
+
+/* Editar só um dia de uma tarefa que se repete */
+.only-day {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--muted-fill);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BackButton, Button, Chip, TextField } from '../components/ui';
 import type { Actions } from '../App';
-import { dayKey, shortDayLabel, WEEK_ORDER, weekdayShort, type HouseView, type Task } from '../state';
+import { dayKey, describeRepeat, shortDayLabel, WEEK_ORDER, weekdayShort, type HouseView, type Task } from '../state';
 
 type Mode = 'once' | 'repeat';
 
@@ -9,7 +9,18 @@ type Mode = 'once' | 'repeat';
  * Tela cheia para criar uma tarefa, ou editar uma (com `task`).
  * Ao salvar, volta sozinha para a home.
  */
-export function NewTask({ view: s, task, actions }: { view: HouseView; task?: Task; actions: Actions }) {
+export function NewTask({
+  view: s,
+  task,
+  onlyDay,
+  actions,
+}: {
+  view: HouseView;
+  task?: Task;
+  /** Tarefa que se repete: editar só este dia ('AAAA-MM-DD'). */
+  onlyDay?: string;
+  actions: Actions;
+}) {
   const today = new Date();
   const todayKey = dayKey(today);
   const [title, setTitle] = useState(task?.title ?? '');
@@ -28,7 +39,8 @@ export function NewTask({ view: s, task, actions }: { view: HouseView; task?: Ta
     title.trim() === task.title &&
     assignee === task.assignee &&
     points === (task.points ?? 1) &&
-    (mode === 'repeat'
+    (!!onlyDay ||
+      mode === 'repeat'
       ? !!task.repeat && [...repeat].sort().join() === [...task.repeat].sort().join()
       : !task.repeat);
   const disabled = !title.trim() || (mode === 'repeat' && repeat.length === 0) || unchanged;
@@ -49,12 +61,13 @@ export function NewTask({ view: s, task, actions }: { view: HouseView; task?: Ta
         if (disabled) return;
         const date = mode === 'once' ? onceDate : null;
         const days = mode === 'repeat' ? repeat : null;
-        if (task) actions.saveTask(task.id, title.trim(), assignee, date, days, points);
+        if (task && onlyDay) actions.saveOccurrence(task.id, onlyDay, title.trim(), assignee, points);
+        else if (task) actions.saveTask(task.id, title.trim(), assignee, date, days, points);
         else actions.addTask(title.trim(), assignee, date, days, points);
       }}
     >
       <BackButton label="Cancelar e voltar para tarefas" onClick={() => actions.go('tasks')} />
-      <h1 className="title-m" style={{ marginTop: 16 }}>{task ? 'Editar tarefa' : 'Nova tarefa'}</h1>
+      <h1 className="title-m" style={{ marginTop: 16 }}>{task ? (onlyDay ? `Editar só ${shortDayLabel(onlyDay)}` : 'Editar tarefa') : 'Nova tarefa'}</h1>
 
       <div className="fields" style={{ marginTop: 24, gap: 24 }}>
         <TextField
@@ -66,26 +79,34 @@ export function NewTask({ view: s, task, actions }: { view: HouseView; task?: Ta
           onChange={(e) => setTitle(e.target.value)}
         />
 
-        <div className="field" style={{ gap: 10 }}>
-          <span className="field-label" id="when-label">Quando?</span>
-          <div className="segmented" role="radiogroup" aria-labelledby="when-label">
-            <button type="button" role="radio" aria-checked={mode === 'once'} onClick={() => setMode('once')}>
-              {onceLabel}
-            </button>
-            <button type="button" role="radio" aria-checked={mode === 'repeat'} onClick={() => setMode('repeat')}>
-              Toda semana
-            </button>
-          </div>
-          {mode === 'repeat' && (
-            <div className="weekdays" role="group" aria-label="Dias da semana">
-              {WEEK_ORDER.map((d) => (
-                <Chip key={d} pressed={repeat.includes(d)} onClick={() => toggleDay(d)}>
-                  {weekdayShort(d)}
-                </Chip>
-              ))}
+        {onlyDay ? (
+          <p className="only-day">
+            Vale só para {shortDayLabel(onlyDay)}. As outras repetições ({describeRepeat(task!.repeat!)}) continuam como estão.
+          </p>
+        ) : (
+          <>
+          <div className="field" style={{ gap: 10 }}>
+            <span className="field-label" id="when-label">Quando?</span>
+            <div className="segmented" role="radiogroup" aria-labelledby="when-label">
+              <button type="button" role="radio" aria-checked={mode === 'once'} onClick={() => setMode('once')}>
+                {onceLabel}
+              </button>
+              <button type="button" role="radio" aria-checked={mode === 'repeat'} onClick={() => setMode('repeat')}>
+                Toda semana
+              </button>
             </div>
-          )}
-        </div>
+            {mode === 'repeat' && (
+              <div className="weekdays" role="group" aria-label="Dias da semana">
+                {WEEK_ORDER.map((d) => (
+                  <Chip key={d} pressed={repeat.includes(d)} onClick={() => toggleDay(d)}>
+                    {weekdayShort(d)}
+                  </Chip>
+                ))}
+              </div>
+            )}
+          </div>
+          </>
+        )}
 
         <div className="field" style={{ gap: 10 }}>
           <span className="field-label" id="points-label">Quantos pontos vale?</span>
