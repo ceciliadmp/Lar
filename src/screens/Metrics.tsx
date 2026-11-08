@@ -35,7 +35,7 @@ interface Bucket {
   id: string;
   /** Rótulo curto no eixo. */
   label: string;
-  /** Nome completo (dica e tabela). */
+  /** Nome completo (dica e descrição para leitor de tela). */
   full: string;
   start: string;
   end: string;
@@ -191,25 +191,6 @@ export function Metrics({ view: s, actions }: { view: HouseView; actions: Action
             <p className="day__empty">Ainda não há tarefas feitas. Quando alguém marcar uma tarefa, ela aparece aqui.</p>
           )}
 
-          <details className="metrics__table">
-            <summary>Ver em tabela</summary>
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col">Período</th>
-                  <th scope="col">Tarefas feitas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...data.bs].reverse().map((b) => (
-                  <tr key={b.id}>
-                    <th scope="row">{b.full}</th>
-                    <td>{b.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
 
           <h2 className="section-title">Quem fez {rangeText}</h2>
           <ul className="list people-bars">

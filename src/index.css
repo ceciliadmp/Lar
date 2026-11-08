@@ -569,13 +569,6 @@ h1, h2, p { margin: 0; }
 .chart__tip--start { transform: translate(-16px, calc(-100% - 10px)); align-items: flex-start; }
 .chart__tip--end { transform: translate(calc(-100% + 16px), calc(-100% - 10px)); align-items: flex-end; }
 .chart__tip strong { font-size: 13px; }
-.metrics__table { margin-top: 12px; font-size: 14px; }
-.metrics__table summary { min-height: 44px; display: flex; align-items: center; color: var(--accent); font-weight: 600; cursor: pointer; }
-.metrics__table table { width: 100%; border-collapse: collapse; }
-.metrics__table th, .metrics__table td { padding: 8px 0; border-bottom: 1px solid var(--line); text-align: left; font-weight: 500; }
-.metrics__table td { text-align: right; font-variant-numeric: tabular-nums; }
-.metrics__table thead th { font-size: 12px; color: var(--ink-3); font-weight: 600; }
-.metrics__table thead th:last-child { text-align: right; }
 .people-bars { margin-top: 8px; }
 .people-bars__row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
 .people-bars__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
