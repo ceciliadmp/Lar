@@ -70,6 +70,9 @@ interface StoredHouse {
   game?: StoredGame;
   /** Pontos tirados (guardados por 70 dias). */
   penalties?: Penalty[];
+  /** Contas da casa (luz, internet, aluguel…). */
+  bills?: Bill[];
+  nextBillId?: number;
 }
 
 interface ScoreEntry {
@@ -98,6 +101,25 @@ export interface Penalty {
 }
 
 export type GamePeriod = 'monthly' | 'biweekly';
+
+/**
+ * Conta da casa. Pontual vale só em `startMonth`; recorrente vale de `startMonth`
+ * em diante (até `endMonth`, se alguém parou a recorrência), menos os meses em `skips`.
+ * Meses são 'AAAA-MM'. O pagamento é separado por mês.
+ */
+export interface Bill {
+  id: number;
+  name: string;
+  /** Valor em centavos (inteiro, para não haver erro de arredondamento). */
+  amount: number;
+  startMonth: string;
+  recurring: boolean;
+  endMonth?: string;
+  skips?: string[];
+  /** Mês → quem marcou como paga. */
+  paid: Record<string, string>;
+  createdBy: string;
+}
 
 interface StoredGame {
   /** Mensal (padrão) ou quinzenal: rodadas de 1 a 15 e de 16 ao fim do mês. */
@@ -167,6 +189,7 @@ export interface HouseView {
   tasks: Task[];
   game: GameView;
   penalties: Penalty[];
+  bills: Bill[];
 }
 
 type Authed<T> = T & { token: string };
@@ -226,6 +249,15 @@ export type Request =
   /** A pessoa fecha o aviso de ponto perdido na home. */
   | Authed<{ action: 'dismissPenalty'; penaltyId: string }>
   | Authed<{ action: 'stopGame' }>
+  /** Nova conta; `amount` em centavos, `month` = 'AAAA-MM'. */
+  | Authed<{ action: 'addBill'; name: string; amount: number; month: string; recurring: boolean }>
+  /** Marca/desmarca a conta como paga naquele mês (só naquele mês). */
+  | Authed<{ action: 'toggleBill'; billId: number; month: string }>
+  /**
+   * Exclui uma conta. Recorrente: "month" = só aquele mês, "future" = daquele mês em diante.
+   * Pontual: sempre a conta inteira.
+   */
+  | Authed<{ action: 'deleteBill'; billId: number; month: string; scope: 'month' | 'future' }>
   /** `photo`: data URL JPEG, ou null para remover. */
   | Authed<{ action: 'setPhoto'; photo: string | null }>
   | Authed<{ action: 'leave' }>;
@@ -361,6 +393,27 @@ const KEEP_DAYS = 70;
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
+}
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function cleanMonth(v: unknown): string {
+  if (typeof v !== 'string' || !MONTH_RE.test(v)) throw new HttpError(400, 'Mês inválido.');
+  return v;
+}
+
+/** 'AAAA-MM' mais `n` meses. */
+function shiftMonth(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + n, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/** A conta vale neste mês? */
+export function billInMonth(b: Bill, month: string): boolean {
+  if (b.skips?.includes(month)) return false;
+  if (!b.recurring) return b.startMonth === month;
+  return month >= b.startMonth && (!b.endMonth || month <= b.endMonth);
 }
 
 function cleanDate(v: unknown): string {
@@ -590,6 +643,7 @@ function view(h: StoredHouse, meId: string): HouseView {
     tasks: h.tasks,
     game: gameView(h),
     penalties: h.penalties ?? [],
+    bills: h.bills ?? [],
   };
 }
 
@@ -1074,6 +1128,60 @@ async function run(store: Store, req: Request, env: Env): Promise<Response> {
         pen.dismissed = true;
         await saveHouse(store, h);
       }
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'addBill': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const name = cleanText(req.name, 'o nome da conta', 60);
+      const amount = Number(req.amount);
+      if (!Number.isInteger(amount) || amount <= 0 || amount > 100_000_000) {
+        throw new HttpError(400, 'Digite um valor entre R$ 0,01 e R$ 1.000.000,00.');
+      }
+      const month = cleanMonth(req.month);
+      h.bills ??= [];
+      if (h.bills.length >= 300) throw new HttpError(409, 'A casa já tem contas demais. Exclua algumas.');
+      h.nextBillId ??= 1;
+      h.bills.push({ id: h.nextBillId++, name, amount, startMonth: month, recurring: !!req.recurring, paid: {}, createdBy: me.id });
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'toggleBill': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const b = h.bills?.find((x) => x.id === req.billId);
+      if (!b) throw new HttpError(404, 'Essa conta foi excluída.');
+      const month = cleanMonth(req.month);
+      if (!billInMonth(b, month)) throw new HttpError(400, 'Essa conta não vale neste mês.');
+      if (b.paid[month]) delete b.paid[month];
+      else b.paid[month] = me.id;
+      await saveHouse(store, h);
+      return { ok: true, account: account(u), view: view(h, me.id) };
+    }
+
+    case 'deleteBill': {
+      const u = await userFromToken(store, req.token);
+      const { h, me } = await requireHouse(store, u);
+      const b = h.bills?.find((x) => x.id === req.billId);
+      if (b) {
+        const month = cleanMonth(req.month);
+        const removeAll = () => (h.bills = h.bills!.filter((x) => x.id !== b.id));
+        if (!b.recurring) removeAll();
+        else if (req.scope === 'future') {
+          // Para a recorrência: os meses anteriores (e os pagamentos deles) continuam.
+          if (month <= b.startMonth) removeAll();
+          else {
+            b.endMonth = shiftMonth(month, -1);
+            for (const m of Object.keys(b.paid)) if (m >= month) delete b.paid[m];
+          }
+        } else {
+          b.skips = [...new Set([...(b.skips ?? []), month])].sort();
+          delete b.paid[month];
+        }
+      }
+      await saveHouse(store, h);
       return { ok: true, account: account(u), view: view(h, me.id) };
     }
 

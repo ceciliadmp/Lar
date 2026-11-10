@@ -104,6 +104,12 @@ const PATHS = {
     </>
   ),
   chart: <path d="M4 20h16M7 20v-7M12 20V5M17 20v-10" />,
+  receipt: (
+    <>
+      <path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5-2 1.5-2.5-1.5L5 21V3Z" />
+      <path d="M9 8h6M9 12h6M9 16h3" />
+    </>
+  ),
   podium: <path d="M3 21h18M4 21v-6h5v6M9.5 21V9h5v12M15 21v-8h5v8" />,
   trend: <path d="M3 4v16h17M7 15l4-4 3 3 6-6" />,
   sliders: (
@@ -142,6 +148,7 @@ const BOUNDS: Record<keyof typeof PATHS, [number, number, number, number]> = {
   more: [3, 3, 21, 21],
   tasks: [3, 5, 21, 19.5],
   chart: [4, 5, 20, 20],
+  receipt: [5, 3, 19, 21],
   podium: [3, 9, 21, 21],
   trend: [3, 4, 20, 20],
   sliders: [4, 4.8, 20, 19.2],

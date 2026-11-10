@@ -1,5 +1,6 @@
 import type {
   Account,
+  Bill,
   GamePeriod,
   GameView,
   HouseView,
@@ -12,12 +13,12 @@ import type {
   Task,
 } from '../api/_lib/house';
 
-export type { Account, GamePeriod, GameView, HouseView, Penalty, RoundResult, StatsView, Task };
-export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'editTask' | 'settings' | 'score' | 'metrics' | 'profile';
+export type { Account, Bill, GamePeriod, GameView, HouseView, Penalty, RoundResult, StatsView, Task };
+export type Screen = 'welcome' | 'signup' | 'login' | 'forgot' | 'reset' | 'home' | 'create' | 'join' | 'tasks' | 'newTask' | 'editTask' | 'settings' | 'score' | 'metrics' | 'bills' | 'profile';
 /** Telas com a barra de abas embaixo. */
-export type TabScreen = 'tasks' | 'score' | 'metrics' | 'settings';
+export type TabScreen = 'tasks' | 'bills' | 'score' | 'metrics' | 'settings';
 export const isTabScreen = (s: Screen): s is TabScreen =>
-  s === 'tasks' || s === 'score' || s === 'metrics' || s === 'settings';
+  s === 'tasks' || s === 'bills' || s === 'score' || s === 'metrics' || s === 'settings';
 /** O que a tela de tarefas mostra. */
 export type Period = 'today' | 'week' | 'all';
 
@@ -276,4 +277,55 @@ export async function photoFromFile(file: File): Promise<string> {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/* ---------- contas (meses 'AAAA-MM', valores em centavos) ---------- */
+
+const MONTH_NAMES = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+/** Mês local como 'AAAA-MM'. */
+export function monthKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function shiftMonthKey(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number);
+  return monthKey(new Date(y, m - 1 + n, 1));
+}
+
+/** "Novembro 2026" */
+export function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+/** A conta vale neste mês? (mesma regra do servidor) */
+export function billInMonth(b: Bill, month: string): boolean {
+  if (b.skips?.includes(month)) return false;
+  if (!b.recurring) return b.startMonth === month;
+  return month >= b.startMonth && (!b.endMonth || month <= b.endMonth);
+}
+
+const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** 15000 → "R$ 150,00" */
+export function formatMoney(cents: number): string {
+  return BRL.format(cents / 100);
+}
+
+/**
+ * Lê o que a pessoa digitou ("150", "150,5", "1.234,56", "R$ 99,90") e devolve centavos,
+ * ou null se não for um valor válido.
+ */
+export function parseMoney(text: string): number | null {
+  let t = text.replace(/R\$|\s/g, '');
+  if (!t) return null;
+  if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
+  else if ((t.match(/\./g) ?? []).length > 1 || /\.\d{3}$/.test(t)) t = t.replace(/\./g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const cents = Math.round(Number(t) * 100);
+  return cents > 0 ? cents : null;
 }

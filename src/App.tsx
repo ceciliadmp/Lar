@@ -20,6 +20,7 @@ import { Forgot, Home, Login, ResetPassword, Signup } from './screens/Auth';
 import { CreateHouse, JoinHouse, Welcome } from './screens/Onboarding';
 import { Tasks } from './screens/Tasks';
 import { Score } from './screens/Score';
+import { Bills } from './screens/Bills';
 import { Metrics } from './screens/Metrics';
 import { Button, Icon } from './components/ui';
 import { clearPhotos } from './photos';
@@ -66,6 +67,12 @@ export interface Actions {
   newCode(): void;
   /** Só o admin: muda o nome da casa. */
   renameHouse(name: string): Promise<string | null>;
+  /** Nova conta (valor em centavos, mês 'AAAA-MM'); retorna a mensagem de erro, ou null. */
+  addBill(name: string, amount: number, month: string, recurring: boolean): Promise<string | null>;
+  /** Marca/desmarca a conta como paga só naquele mês. */
+  toggleBill(id: number, month: string): void;
+  /** Recorrente: "month" = só aquele mês, "future" = daquele mês em diante. */
+  deleteBill(id: number, month: string, scope: 'month' | 'future'): void;
   /** Métricas da casa (tarefas feitas por dia); null se falhar. */
   getStats(): Promise<StatsView | null>;
   /** Foto como data URL JPEG, ou null para remover. */
@@ -115,7 +122,7 @@ export default function App() {
     setAccount(res.account);
     setView(res.view);
     if (!res.view) {
-      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'settings' || s === 'score' || s === 'metrics' ? 'home' : s));
+      setScreen((s) => (s === 'tasks' || s === 'newTask' || s === 'editTask' || s === 'settings' || s === 'score' || s === 'metrics' || s === 'bills' ? 'home' : s));
       if (hadHouse.current) setNotice('Você não faz mais parte desta casa.');
     }
     hadHouse.current = !!res.view;
@@ -317,6 +324,30 @@ export default function App() {
     },
     removeMember: (id) => token && void send({ action: 'removeMember', token, memberId: id }),
     newCode: () => token && void send({ action: 'newCode', token }),
+    addBill: (name, amount, month, recurring) =>
+      attempt(async () => {
+        const res = await api({ action: 'addBill', token: token!, name, amount, month, recurring });
+        apply(res);
+      }),
+    toggleBill: (id, month) => {
+      if (!token || !view) return;
+      // Marca na hora; a resposta do servidor confirma.
+      setView({
+        ...view,
+        bills: view.bills.map((b) => {
+          if (b.id !== id) return b;
+          const paid = { ...b.paid };
+          if (paid[month]) delete paid[month];
+          else paid[month] = view.meId;
+          return { ...b, paid };
+        }),
+      });
+      void send({ action: 'toggleBill', token, billId: id, month });
+    },
+    deleteBill: (id, month, scope) => {
+      if (!token) return;
+      void send({ action: 'deleteBill', token, billId: id, month, scope });
+    },
     getStats: async () => {
       if (!token) return null;
       const res = await send({ action: 'getStats', token });
@@ -361,7 +392,7 @@ export default function App() {
     },
   };
 
-  const inHouse = ['tasks', 'newTask', 'editTask', 'settings', 'score', 'metrics'].includes(screen);
+  const inHouse = ['tasks', 'newTask', 'editTask', 'settings', 'score', 'metrics', 'bills'].includes(screen);
   const tab = view && isTabScreen(screen) ? screen : null;
   const editing = view?.tasks.find((t) => t.id === editingId) ?? null;
 
@@ -384,6 +415,7 @@ export default function App() {
             <div className="tab-layout">
               <div className="tab-layout__content">
                 {tab === 'tasks' && <Tasks view={view} period={period} fresh={fresh} actions={actions} />}
+                {tab === 'bills' && <Bills view={view} actions={actions} />}
                 {tab === 'score' && <Score view={view} actions={actions} />}
                 {tab === 'metrics' && <Metrics view={view} actions={actions} />}
                 {tab === 'settings' && account && <Settings view={view} account={account} actions={actions} />}
